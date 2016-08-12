@@ -1,0 +1,28 @@
+# Ignore compiled python code and python cache
+*.pyc
+reactor/*.pyc
+tests/*.pyc
+bin/__pycache__/
+reactor/__pycache__/
+tests/__pycache__/
+
+# Ignore IDE files
+.idea/
+
+# Ignore distribution files
+dist/
+build/
+reactor.egg-info/
+MANIFEST
+
+# Ignore Coverage Report
+*.coverage
+
+# Ignore the log files
+reactor/logs/
+
+# Ignore Protocol Buffers generated code
+reactor/*_pb2.py
+
+# Ignore MAC Special Files
+.DS_Store

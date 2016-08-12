@@ -1,0 +1,64 @@
+<style type="text/css">
+	.MAtable{
+    padding: 0;
+    margin: 0 auto;
+		border-collapse:collapse;
+	}
+  .MAtable th{
+		padding:10px;
+    border-right:1px solid #c0c0c0;
+		border-top:1px solid #c0c0c0;
+		border-bottom:1px solid #c0c0c0;
+    color: #eeffee;
+    background: #444444;
+    text-transform: uppercase;
+    text-align: center;
+    letter-spacing: 1.5px;
+    font: bold 11px "Trebuchet MS", Verdana, Arial, Helvetica, sans-serif;
+	}
+	.MAtable td{
+		padding:5px 20px 5px 20px;
+    border:0px;
+    text-align: center;
+    font: normal 11px "Trebuchet MS", Verdana, Arial, Helvetica, sans-serif;
+	}
+	/*  Define the background color for all the ODD background rows  */
+	.MAtable tr:nth-child(odd){
+		background: #eeffee;
+	}
+	/*  Define the background color for all the EVEN background rows  */
+	.MAtable tr:nth-child(even){
+		background: #c0ffc0;
+	}
+	.VCtable{
+    padding: 0;
+    margin: 0 auto;
+		border-collapse:collapse;
+	}
+  .VCtable th{
+		padding:10px;
+    border-right:1px solid #c0c0c0;
+		border-top:1px solid #c0c0c0;
+		border-bottom:1px solid #c0c0c0;
+    color: #eeffee;
+    background: #444444;
+    text-transform: uppercase;
+    text-align: center;
+    letter-spacing: 1.5px;
+    font: bold 11px "Trebuchet MS", Verdana, Arial, Helvetica, sans-serif;
+	}
+	.VCtable td{
+		padding:5px 20px 5px 20px;
+    border:0px;
+    text-align: center;
+    font: normal 11px "Trebuchet MS", Verdana, Arial, Helvetica, sans-serif;
+	}
+	/*  Define the background color for all the ODD background rows  */
+	.VCtable tr:nth-child(odd){
+		background: #eeeeff;
+	}
+	/*  Define the background color for all the EVEN background rows  */
+	.VCtable tr:nth-child(even){
+		background: #c0c0ff;
+	}
+</style>
