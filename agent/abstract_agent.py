@@ -110,8 +110,7 @@ class AbstractAgent(object):
                 self._handle_subscription(instance)
             else:
                 subscription_id = self._db.get(instance + "ID")
-                self._logger.info("Skipping disabled Subscription [{}]"
-                                  .format(subscription_id))
+                self._logger.info("Skipping disabled Subscription [%s]", subscription_id)
 
     def start_listening(self):
         """
@@ -141,7 +140,7 @@ class AbstractAgent(object):
     def _load_services(self):
         """Load Home Automation Services Helpers"""
         product_class = self._db.get("Device.LocalAgent.ProductClass")
-        self._logger.info("Loading Services for Product Class [{}]".format(product_class))
+        self._logger.info("Loading Services for Product Class [%s]", product_class)
 
         if product_class == "RPi_Motion":
             default_cfg = {GPIO_PIN: "4"}
@@ -160,26 +159,26 @@ class AbstractAgent(object):
             camera_ui = target_ui_class(host="0.0.0.0", directory=camera_image_dir)
             camera_ui.start()
         else:
-            self._logger.warn("No Services to load for Product Class [{}]".format(product_class))
+            self._logger.warning("No Services to load for Product Class [%s]", product_class)
 
     def _get_class(self, name, mod_name, class_name):
         """Retrieve the class instance from the provided property"""
         target_class = None
 
-        self._logger.info("Processing [{}]: Class [{}] within Module [{}]"
-                          .format(name, class_name, mod_name))
+        self._logger.info("Processing [%s]: Class [%s] within Module [%s]",
+                          name, class_name, mod_name)
 
         # import the module, get the class, and instantiate the class
         try:
             mod = importlib.import_module(mod_name)
             target_class = getattr(mod, class_name)
         except ImportError:
-            self._logger.warning("Issue with [{}]: Module [{}] could not be imported... Skipping"
-                                 .format(name, mod_name))
+            self._logger.warning("Issue with [%s]: Module [%s] could not be imported... Skipping",
+                                 name, mod_name)
         except AttributeError:
             self._logger.warning(
-                "Issue with [{}]: Class [{}] within Module [{}] could not be found... Skipping"
-                .format(name, class_name, mod_name))
+                "Issue with [%s]: Class [%s] within Module [%s] could not be found... Skipping",
+                name, class_name, mod_name)
 
         return target_class
 
@@ -198,44 +197,11 @@ class AbstractAgent(object):
                     controller_id = self._db.get(controller_path + "EndpointID")
 
                     if notif_type == "Boot":
-                        boot_notif = notify.BootNotification(self._endpoint_id, controller_id,
-                                                             subscription_id, self._db)
-                        notif_sender = self._get_notification_sender(boot_notif, controller_id,
-                                                                     controller_path)
-                        if notif_sender is not None:
-                            self._boot_notif_sender_list.append(notif_sender)
-                            self._logger.info("Processed Boot Subscription [%s] for Controller [%s]",
-                                              subscription_id, controller_id)
-                        else:
-                            self._logger.warning(
-                                "Skipping Subscription [%s] because Notification Sender not found",
-                                subscription_id)
+                        self._handle_boot(controller_id, controller_path, subscription_id)
                     elif notif_type == "Periodic":
-                        param_path = self._db.get(subscription_path + "ParamPath")
-                        periodic_interval = self._db.get(param_path + "PeriodicInterval")
-                        periodic_handler = self._get_periodic_notif_handler(self._endpoint_id, controller_id,
-                                                                            controller_path, subscription_id,
-                                                                            param_path, periodic_interval)
-                        if periodic_handler is not None:
-                            self._periodic_handler_list.append(periodic_handler)
-                            self._logger.info("Processed Periodic Subscription [%s] for Controller [%s]",
-                                              subscription_id, controller_id)
-                        else:
-                            self._logger.warning(
-                                "Skipping Subscription [%s] because Periodic Notification Handler not found",
-                                subscription_id)
+                        self._handle_periodic(subscription_path, controller_id, controller_path, subscription_id)
                     elif notif_type == "ValueChange":
-                        param_path = self._db.get(subscription_path + "ParamPath")
-                        if self._value_change_notif_poller is not None:
-                            notif_details = self._value_change_notif_poller.get_value_change_details(
-                                self._endpoint_id, controller_id, controller_path, subscription_id)
-                            self._value_change_notif_poller.add_param(param_path, notif_details)
-                            self._logger.info("Processed ValueChange Subscription [%s] for Controller [{%s]",
-                                              subscription_id, controller_id)
-                        else:
-                            self._logger.warning(
-                                "Skipping Subscription [%s] because ValueChange Notification Poller isn't configured",
-                                subscription_id)
+                        self._handle_value_change(subscription_path, controller_id, controller_path, subscription_id)
                 else:
                     self._logger.warning(
                         "Skipping Subscription [%s] because it references a controller with an invalid protocol [%s]",
@@ -246,6 +212,51 @@ class AbstractAgent(object):
         else:
             self._logger.warning("Skipping Subscription [%s] because it has an unhandled notification type [%s]",
                                  subscription_id, notif_type)
+
+    def _handle_boot(self, controller_id, controller_path, subscription_id):
+        """Handle a Subscription for a Boot Notification"""
+        boot_notif = notify.BootNotification(self._endpoint_id, controller_id,
+                                             subscription_id, self._db)
+        notif_sender = self._get_notification_sender(boot_notif, controller_id,
+                                                     controller_path)
+        if notif_sender is not None:
+            self._boot_notif_sender_list.append(notif_sender)
+            self._logger.info("Processed Boot Subscription [%s] for Controller [%s]",
+                              subscription_id, controller_id)
+        else:
+            self._logger.warning(
+                "Skipping Subscription [%s] because Notification Sender not found",
+                subscription_id)
+
+    def _handle_periodic(self, subscription_path, controller_id, controller_path, subscription_id):
+        """Handle a Subscription for a Periodic Notification"""
+        param_path = self._db.get(subscription_path + "ParamPath")
+        periodic_interval = self._db.get(param_path + "PeriodicInterval")
+        periodic_handler = self._get_periodic_notif_handler(self._endpoint_id, controller_id,
+                                                            controller_path, subscription_id,
+                                                            param_path, periodic_interval)
+        if periodic_handler is not None:
+            self._periodic_handler_list.append(periodic_handler)
+            self._logger.info("Processed Periodic Subscription [%s] for Controller [%s]",
+                              subscription_id, controller_id)
+        else:
+            self._logger.warning(
+                "Skipping Subscription [%s] because Periodic Notification Handler not found",
+                subscription_id)
+
+    def _handle_value_change(self, subscription_path, controller_id, controller_path, subscription_id):
+        """Handle a Subscription for a ValueChange Notification"""
+        param_path = self._db.get(subscription_path + "ParamPath")
+        if self._value_change_notif_poller is not None:
+            notif_details = self._value_change_notif_poller.get_value_change_details(
+                self._endpoint_id, controller_id, controller_path, subscription_id)
+            self._value_change_notif_poller.add_param(param_path, notif_details)
+            self._logger.info("Processed ValueChange Subscription [%s] for Controller [{%s]",
+                              subscription_id, controller_id)
+        else:
+            self._logger.warning(
+                "Skipping Subscription [%s] because ValueChange Notification Poller isn't configured",
+                subscription_id)
 
     def _get_supported_protocol(self):
         """Return the supported Protocol as a String: CoAP, STOMP, HTTP/2, WebSockets"""
@@ -281,8 +292,7 @@ class AbstractPeriodicNotifHandler(threading.Thread):
         binding_exists = True
         while binding_exists:
             time.sleep(self._periodic_interval)
-            self._logger.info("Sending a Periodic Notification to {}"
-                              .format(self._to_id))
+            self._logger.info("Sending a Periodic Notification to %s", self._to_id)
             notif = notify.PeriodicNotification(self._from_id, self._to_id,
                                                 self._subscription_id, self._param)
             binding_exists = self._handle_periodic(notif)
@@ -297,15 +307,15 @@ class AbstractPeriodicNotifHandler(threading.Thread):
 class AbstractValueChangeNotifPoller(threading.Thread):
     """An Abstract Value Change Notification Poller that is extended for specific bindings such that
         ValueChange Notifications can be issued when a Parameter's Value has Changed"""
-    def __init__(self, agent_db, poll_duration):
+    def __init__(self, agent_database, poll_duration):
         """Initialize the Value Change Notification Poller Thread"""
         threading.Thread.__init__(self, name="ValueChangeNotifPoller")
-        self._db = agent_db
+        self._db = agent_database
         self._param_cache = {}
         self._param_poll_list = []
+        self._notif_details_dict = {}
         self._cache_lock = threading.Lock()
         self._poll_duration = poll_duration
-        self._value_change_notif_details_dict = {}
         self._logger = logging.getLogger(self.__class__.__name__)
 
 
@@ -322,24 +332,24 @@ class AbstractValueChangeNotifPoller(threading.Thread):
                     if value != self._param_cache[param]:
                         self._logger.info("Value Change detected for %s", param)
                         self._param_cache[param] = value
-                        notif_details = self._value_change_notif_details_dict[param]
+                        notif_details = self._notif_details_dict[param]
                         self._handle_value_change(param, value, notif_details)
 
     def add_param(self, param, value_change_notif_details):
         """Add a Parameter to the Polling List"""
-        self._logger.info("Adding {} to the ValueChange Notification Poller".format(param))
+        self._logger.info("Adding %s to the ValueChange Notification Poller", param)
         with self._cache_lock:
             self._param_cache[param] = self._db.get(param)
             self._param_poll_list.append(param)
-            self._value_change_notif_details_dict[param] = value_change_notif_details
+            self._notif_details_dict[param] = value_change_notif_details
 
     def remove_param(self, param):
         """Remove a Parameter from the Polling List"""
-        self._logger.info("Removing {} from the ValueChange Notification Poller".format(param))
+        self._logger.info("Removing %s from the ValueChange Notification Poller", param)
         with self._cache_lock:
             del self._param_cache[param]
             self._param_poll_list.remove(param)
-            del self._value_change_notif_details_dict[param]
+            del self._notif_details_dict[param]
 
     def get_value_change_details(self, agent_id, controller_id, controller_param_path, subscription_id):
         """Return a Dictionary containing the binding details needed to issue the Value Change Notification"""
