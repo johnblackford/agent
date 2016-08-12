@@ -61,7 +61,7 @@ class Agent(stomp_agent.StompAgent):
         client_type = args.client_type
 
         dm_file_name = "database/{}-dm.json".format(client_type)
-        db_file_name = "database/{}-db.json".format(client_type)
+        db_file_name = "database/{}.db".format(client_type)
 
         stomp_agent.StompAgent.__init__(self, dm_file_name, db_file_name, cfg_file_name, debug)
         stomp_agent.start_listening()
