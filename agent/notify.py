@@ -69,6 +69,7 @@ class Notification(object):
 
     @staticmethod
     def get_message_id():
+        """Retrieve a random message ID"""
         rand_val = random.randint(1, 10000)
         return str(rand_val)
 
