@@ -1,9 +1,9 @@
 # Ignore compiled python code and python cache
 *.pyc
-reactor/*.pyc
+agent/*.pyc
 tests/*.pyc
 bin/__pycache__/
-reactor/__pycache__/
+agent/__pycache__/
 tests/__pycache__/
 
 # Ignore IDE files
@@ -19,10 +19,13 @@ MANIFEST
 *.coverage
 
 # Ignore the log files
-reactor/logs/
+logs/
+
+# Ignore the databases
+database/*.db
 
 # Ignore Protocol Buffers generated code
-reactor/*_pb2.py
+agent/*_pb2.py
 
 # Ignore MAC Special Files
 .DS_Store
