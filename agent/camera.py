@@ -41,6 +41,8 @@ import datetime
 
 import picamera
 
+from agent import utils
+
 
 LOG_FILE = "logs/agent.log"
 
@@ -115,14 +117,7 @@ class PersistRecordedImage(RecordImage):
 
     def _get_time_as_str(self, time_to_convert):
         timezone = self._db.get("Device.Time.LocalTimeZone")
-        tz_part = timezone.split(",")[0]
-        datetime_to_convert = datetime.datetime.fromtimestamp(time_to_convert)
-        datetime_as_str = datetime_to_convert.strftime("%Y-%m-%dT%H:%M:%S")
-        if tz_part == "CST6CDT":
-            datetime_as_str += "-06:00"
-        else:
-            datetime_as_str += "Z"
-        return datetime_as_str
+        return utils.TimeHelper.get_time_as_str(time_to_convert, timezone)
 
 
 

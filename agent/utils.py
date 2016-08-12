@@ -36,7 +36,10 @@ SOFTWARE.
 """
 
 import json
+import datetime
 import subprocess
+
+from agent import usp_pb2 as usp
 
 
 
@@ -153,3 +156,25 @@ class IPAddr:
         sdata = data[0].decode("utf-8").split('\n')
         ipaddr = sdata[3].strip().split(' ')[1].split('/')[0]
         return ipaddr
+
+
+
+class TimeHelper(object):
+    """A Helper Class for getting the Time as a String"""
+    @staticmethod
+    def get_time_as_str(time_to_convert, timezone=None):
+        """Convert the incoming Time to a String"""
+        tz_part = ""
+
+        if timezone is not None:
+            tz_part = timezone.split(",")[0]
+
+        datetime_to_convert = datetime.datetime.fromtimestamp(time_to_convert)
+        datetime_as_str = datetime_to_convert.strftime("%Y-%m-%dT%H:%M:%S")
+
+        if tz_part == "CST6CDT":
+            datetime_as_str += "-06:00"
+        else:
+            datetime_as_str += "Z"
+
+        return datetime_as_str

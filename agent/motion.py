@@ -37,9 +37,10 @@ SOFTWARE.
 
 import time
 import logging
-import datetime
 
 import RPi.GPIO as GPIO
+
+from agent import utils
 
 
 
@@ -80,8 +81,7 @@ class PersistDetectedMotion(DetectMotion):
 
         if last_trigger != "0001-01-01T00:00:00Z":
             last_trigger_substr = last_trigger[:19]
-            last_trigger_as_time_struct = time.strptime(
-                                           last_trigger_substr, "%Y-%m-%dT%H:%M:%S")
+            last_trigger_as_time_struct = time.strptime(last_trigger_substr, "%Y-%m-%dT%H:%M:%S")
             last_trigger_as_int = time.mktime(last_trigger_as_time_struct)
 
         if GPIO.input(gpio_pin):
@@ -94,21 +94,15 @@ class PersistDetectedMotion(DetectMotion):
 
 
     def _get_time_as_str(self, time_to_convert):
-        tz = self._db.get("Device.Time.LocalTimeZone")
-        tz_part = tz.split(",")[0]
-        datetime_to_convert = datetime.datetime.fromtimestamp(time_to_convert)
-        datetime_as_str = datetime_to_convert.strftime("%Y-%m-%dT%H:%M:%S")
-        if tz_part == "CST6CDT":
-            datetime_as_str += "-06:00"
-        else:
-            datetime_as_str += "Z"
-        return datetime_as_str
+        timezone = self._db.get("Device.Time.LocalTimeZone")
+        return utils.TimeHelper.get_time_as_str(time_to_convert, timezone)
 
 
 
 
 def test():
-    dm = DetectMotion(4)
+    """Test the DetectMotion Class"""
+    DetectMotion(4)
     print("Sleeping for 30 seconds")
     time.sleep(30)
     print("Exiting...")
