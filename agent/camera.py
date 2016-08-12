@@ -65,10 +65,10 @@ class RecordImage(object):
         filename2 = self._filename_prefix + "_" + timestamp + "_2.jpg"
         full_filename2 = self._directory + "/" + filename2
         self._camera.capture(full_filename1)
-        self._logger.info("Capturing picture [{}]".format(full_filename1))
+        self._logger.info("Capturing picture [%s]", full_filename1)
         time.sleep(0.5)
         self._camera.capture(full_filename2)
-        self._logger.info("Capturing picture [{}]".format(full_filename2))
+        self._logger.info("Capturing picture [%s]", full_filename2)
 
         return [filename1, filename2]
 
@@ -107,16 +107,15 @@ class PersistRecordedImage(RecordImage):
             pic_url = "http://" + agent_ip + ":" + self._port + "/camera/" + pic
             url_param_path = self.PIC_TABLE + str(inst_num) + ".URL"
             self._db.update(url_param_path, pic_url)
-            self._logger.info("Inserting picture [{}] into the DB at [{}]"
-                              .format(pic_url, url_param_path))
+            self._logger.info("Inserting picture [%s] into the DB at [%s]", pic_url, url_param_path)
             param_map[url_param_path] = pic_url
 
         return param_map
 
 
     def _get_time_as_str(self, time_to_convert):
-        tz = self._db.get("Device.Time.LocalTimeZone")
-        tz_part = tz.split(",")[0]
+        timezone = self._db.get("Device.Time.LocalTimeZone")
+        tz_part = timezone.split(",")[0]
         datetime_to_convert = datetime.datetime.fromtimestamp(time_to_convert)
         datetime_as_str = datetime_to_convert.strftime("%Y-%m-%dT%H:%M:%S")
         if tz_part == "CST6CDT":
@@ -133,8 +132,8 @@ def test():
     logging.basicConfig(filename=LOG_FILE, level=logging.INFO,
                         format='%(asctime)-15s %(name)s %(levelname)-8s %(message)s')
 
-    ri = RecordImage("pictures", "image")
-    ri.take_picture()
+    rec_image = RecordImage("pictures", "image")
+    rec_image.take_picture()
 
 
 if __name__ == "__main__":

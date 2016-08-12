@@ -42,9 +42,9 @@ SOFTWARE.
 #
 """
 
+import threading
 
 import bottle
-import threading
 
 
 
@@ -60,7 +60,7 @@ class CameraWebUI(object):
     @classmethod
     def init_routes(cls, web_app):
         """Initialize the Bottle Routes as needed"""
-        picture_route = "/" + web_app._directory + "/<filename>"
+        picture_route = "/" + web_app.get_directory() + "/<filename>"
         bottle.route("/camera/<image_file_name>")(web_app.show_picture)
         bottle.route(picture_route)(web_app.serve_static_images)
         bottle.route("/static/<filename>")(web_app.serve_static_files)
@@ -68,7 +68,19 @@ class CameraWebUI(object):
     @classmethod
     def start(cls, web_app):
         """Start the Bottle Web Server"""
-        bottle.run(host=web_app._host, port=web_app._port, debug=True)
+        bottle.run(host=web_app.get_host(), port=web_app.get_port(), debug=True)
+
+    def get_host(self):
+        """Retrieve the Host Name"""
+        return self._host
+
+    def get_port(self):
+        """Retrieve the Port Name"""
+        return self._port
+
+    def get_directory(self):
+        """Retrieve the Directory"""
+        return self._directory
 
 
     def serve_static_files(self, filename):
@@ -84,8 +96,7 @@ class CameraWebUI(object):
         """Web UI Page to show all pictures"""
         timestamp = image_file_name.split("_")[1]
         filename = "/" + self._directory + "/" + image_file_name
-        return bottle.template("camera_image", timestamp = timestamp,
-                               filename = filename)
+        return bottle.template("camera_image", timestamp=timestamp, filename=filename)
 
 
 
@@ -94,7 +105,7 @@ class ThreadedCameraWebUI(threading.Thread):
     def __init__(self, host="localhost", port="8080", directory="pictures"):
         """Initialize the ThreadedCameraWebUI and Create a CameraWebUI"""
         threading.Thread.__init__(self)
-        self._web_app = CameraWebUI(host, port)
+        self._web_app = CameraWebUI(host, port, directory)
         CameraWebUI.init_routes(self._web_app)
 
 
