@@ -37,10 +37,11 @@ SOFTWARE.
 """
 
 import time
-import stomp
 import logging
 import threading
 import base64
+
+import stomp
 
 
 
@@ -65,7 +66,7 @@ class StompUspBinding(stomp.ConnectionListener):
 
     def on_error(self, headers, message):
         """STOMP Connection Listener - handle errors"""
-        self._logger.error("Received an error [{}]".format(message))
+        self._logger.error("Received an error [%s]", message)
 
 
     def on_message(self, headers, body):
@@ -73,7 +74,7 @@ class StompUspBinding(stomp.ConnectionListener):
         stomp_body = body
         stomp_headers = headers
         self._logger.info("Message received via STOMP Binding")
-        self._logger.debug("Received Message contents: [{}]".format(body))
+        self._logger.debug("Received Message contents: [%s]", body)
 
         # Validate the STOMP Headers
         if "content-type" in stomp_headers:
@@ -81,15 +82,15 @@ class StompUspBinding(stomp.ConnectionListener):
             if stomp_headers["content-type"].startswith("text/plain;base64"):
                 self._logger.debug("STOMP Message has a proper 'content-type'")
                 decoded_body = base64.b64decode(body)
-                self._logger.debug("Received Message was decoded to [{}]".format(decoded_body))
+                self._logger.debug("Received Message was decoded to [%s]", decoded_body)
                 stomp_body = decoded_body
             elif stomp_headers["content-type"].startswith("application/octet-stream"):
                 self._logger.debug("STOMP Message has a proper 'content-type'")
             else:
-                self._logger.warn("STOMP Message has a bad 'content-type' [{}]"
-                                  .format(stomp_headers["content-type"]))
+                self._logger.warning("STOMP Message has a bad 'content-type' [%s]",
+                                     stomp_headers["content-type"])
         else:
-            self._logger.warn("STOMP Message has no 'content-type'")
+            self._logger.warning("STOMP Message has no 'content-type'")
 
         # Add the STOMP Message to the queue after acquiring the lock
         with self._queue_lock:
@@ -149,7 +150,7 @@ class StompUspBinding(stomp.ConnectionListener):
             self._incoming_queue.append(body)
 
 
-    def send_msg(self, msg, to, encode_as_b64=False):
+    def send_msg(self, msg, to_addr, encode_as_b64=False):
         """Send the outgoing message to the STOMP Destination
             NOTE: the Base64 option is to get around a decoding problem
                    with stomp.py as it attempts to auto-decode the binary
@@ -157,11 +158,11 @@ class StompUspBinding(stomp.ConnectionListener):
         msg_to_send = msg
         content_type = "application/octet-stream"
 
-        if to is not None:
-            if to.startswith("/"):
-                dest = "/queue" + to
+        if to_addr is not None:
+            if to_addr.startswith("/"):
+                dest = "/queue" + to_addr
             else:
-                dest = "/queue/" + to
+                dest = "/queue/" + to_addr
 
             if encode_as_b64:
                 content_type = "text/plain;base64"
@@ -171,10 +172,10 @@ class StompUspBinding(stomp.ConnectionListener):
             self._logger.info("Message sent via STOMP Binding")
 
             if encode_as_b64:
-                self._logger.debug("Sent Message contents: [{}] encoded as [{}]"
-                                   .format(msg, msg_to_send))
+                self._logger.debug("Sent Message contents: [%s] encoded as [%s]",
+                                   msg, msg_to_send)
             else:
-                self._logger.debug("Sent Message contents: [{}]".format(msg_to_send))
+                self._logger.debug("Sent Message contents: [%s]", msg_to_send)
         else:
             self.logger.error("Invalid Send Args encountered")
             raise StompProtocolBindingError("Invalid Send Args")
