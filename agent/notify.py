@@ -37,8 +37,7 @@ SOFTWARE.
 """
 
 
-import random
-
+from agent import utils
 from agent import usp_pb2 as usp
 
 
@@ -58,7 +57,7 @@ class Notification(object):
 
     def _init_notif(self, notif, send_resp=False):
         """Set the Header Information of the Notification"""
-        notif.header.msg_id = Notification.get_message_id()
+        notif.header.msg_id = utils.MessageIdHelper.get_message_id()
         notif.header.msg_type = usp.Header.NOTIFY
         notif.header.proto_version = "1.0"
         notif.header.to_id = self._to_id
@@ -66,12 +65,6 @@ class Notification(object):
 
         notif.body.request.notify.subscription_id = self._subscription_id
         notif.body.request.notify.send_resp = send_resp
-
-    @staticmethod
-    def get_message_id():
-        """Retrieve a random message ID"""
-        rand_val = random.randint(1, 10000)
-        return str(rand_val)
 
 
 

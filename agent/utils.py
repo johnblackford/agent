@@ -36,6 +36,7 @@ SOFTWARE.
 """
 
 import json
+import random
 import datetime
 import subprocess
 
@@ -81,12 +82,11 @@ class MissingConfigError(Exception):
 class UspErrMsg(object):
     """A USP Error Message object that allows a USP Agent to generate a USP Error Message
        NOTE: All generated Messages are usp_pb2.Msg format, not serialized"""
-    def __init__(self, msg_id, to_id, from_id, reply_to_id=None):
+    def __init__(self, msg_id, to_id, from_id):
         """Initialize the USP Message Header"""
         self._msg_id = msg_id
         self._to_id = to_id
         self._from_id = from_id
-        self._reply_to_id = reply_to_id
         self._msg = usp.Msg()
 
 
@@ -96,9 +96,6 @@ class UspErrMsg(object):
         self._msg.header.proto_version = "1.0"
         self._msg.header.to_id = self._to_id
         self._msg.header.from_id = self._from_id
-
-        if self._reply_to_id is not None:
-            self._msg.header.reply_to_id = self._reply_to_id
 
 
     def generate_error(self, error_code, error_message):
@@ -111,6 +108,16 @@ class UspErrMsg(object):
         self._msg.body.error.err_msg = error_message
 
         return self._msg
+
+
+
+class MessageIdHelper:
+    """A Helper class to generate Random Message IDs"""
+    @staticmethod
+    def get_message_id():
+        """Retrieve a random message ID"""
+        rand_val = random.randint(1, 10000)
+        return str(rand_val)
 
 
 
