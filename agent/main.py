@@ -64,8 +64,8 @@ class Agent(stomp_agent.StompAgent):
         db_file_name = "database/{}.db".format(client_type)
 
         stomp_agent.StompAgent.__init__(self, dm_file_name, db_file_name, cfg_file_name, debug)
-        stomp_agent.start_listening()
-        stomp_agent.clean_up()
+        self.start_listening()
+        self.clean_up()
 
 
 def main():
