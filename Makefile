@@ -20,7 +20,7 @@ lint:
 	find agent -name "*.py" | egrep -v 'usp_pb2' | xargs pylint || :
 
 run:
-	python3 -m agent.main -p --host "stomp.johnblackford.org"
+	python3 -m agent.main -t test
 
 run2:
-	python3 bin/agent.py --host "stomp.johnblackford.org"
+	python3 bin/agent.py -t test
