@@ -63,15 +63,19 @@ class StompAgent(abstract_agent.AbstractAgent):
         """Initialize the STOMP Agent"""
         abstract_agent.AbstractAgent.__init__(self, dm_file, db_file, cfg_file_name, debug)
 
+        self._timeout = 15
         self._binding_dict = {}
-        self._stomp_value_change_notif_poller = StompValueChangeNotifPoller(self._db)
-        self.set_value_change_notif_poller(self._stomp_value_change_notif_poller)
+        self.set_value_change_notif_poller(StompValueChangeNotifPoller(self._db))
 
         self._init_bindings()
         self.init_subscriptions()
 
 
-    def start_listening(self, timeout=15):
+    def set_listen_timeout(self, timeout):
+        """Override the default 15 second listening timeout"""
+        self._timeout = timeout
+
+    def start_listening(self):
         """Start listening for messages and process them"""
         binding_listener_list = []
         abstract_agent.AbstractAgent.start_listening(self)
@@ -80,7 +84,7 @@ class StompAgent(abstract_agent.AbstractAgent):
         for binding_key in self._binding_dict:
             msg_handler = self.get_msg_handler()
             binding = self._binding_dict[binding_key]
-            listener = StompBindingListener(binding_key, binding, msg_handler, timeout)
+            listener = StompBindingListener(binding_key, binding, msg_handler, self._timeout)
             listener.start()
             binding_listener_list.append(listener)
 
@@ -118,7 +122,7 @@ class StompAgent(abstract_agent.AbstractAgent):
             binding = stomp_usp_binding.StompUspBinding(host, port, username, password)
             binding.listen(self._endpoint_id)
             self._binding_dict[controller_path] = binding
-            self._stomp_value_change_notif_poller.add_binding(controller_path, binding)
+            self.get_value_change_notif_poller().add_binding(controller_path, binding)
         else:
             self._logger.warning("Skipping controller with an invalid protocol [%s]", protocol)
 
@@ -206,7 +210,7 @@ class StompBindingListener(threading.Thread):
 
             #TODO: Check with the self._msg_handler if should shutdown, and raise a GeneratorExist
         except stomp_usp_binding.StompProtocolBindingError as err:
-            self._logger.error("USP Binding Error: {}".format(err))
+            self._logger.error("USP Binding Error: %s", err)
         except request_handler.ProtocolViolationError:
             # Error already logged in the USP Protocol Tool, nothing to do
             pass

@@ -35,8 +35,9 @@ SOFTWARE.
 
 import logging
 
-import agent_db
-import usp_pb2 as usp
+from agent import utils
+from agent import agent_db
+from agent import usp_pb2 as usp
 
 
 TAKE_PICTURE_CAMERA_OP = "Device.Services.HomeAutomation.1.Camera.1.TakePicture()"
@@ -68,13 +69,13 @@ class UspRequestHandler(object):
         try:
             # Validate the payload before processing it
             self._validate_request(req)
-            self._logger.info("Received a [{}] Request"
-                              .format(req.body.request.WhichOneof("request")))
+            self._logger.info("Received a [%s] Request",
+                              req.body.request.WhichOneof("request"))
 
             resp = self._process_request(req)
         except ProtocolValidationError as err:
             err_msg = "USP Message validation failed: {}".format(err)
-            self._logger.error("{}".format(err_msg))
+            self._logger.error("%s", err_msg)
             print(err_msg)
             raise ProtocolViolationError(err_msg)
 
@@ -108,9 +109,10 @@ class UspRequestHandler(object):
 
     def _process_request(self, req):
         """Processing the incoming Message and return a Response"""
-        err_code = 9000
+        to_id = req.header.from_id
         err_msg = "Message Failure: Request body does not match Header msg_type"
-        resp = UspMsgGenerator.generate_error(req, self._id, err_code, err_msg)
+        usp_err_msg = utils.UspErrMsg(utils.MessageIdHelper.get_message_id(), to_id, self._id)
+        resp = usp_err_msg.generate_error(9000, err_msg)
 
         if req.header.msg_type == usp.Header.GET:
             # Validate that the Request body matches the Header's msg_type
@@ -130,7 +132,7 @@ class UspRequestHandler(object):
                 resp = self._process_operation(req)
         else:
             err_msg = "Invalid USP Message: unknown command"
-            resp = UspMsgGenerator.generate_error(req, self._id, 9000, err_msg)
+            resp = usp_err_msg.generate_error(9000, err_msg)
 
         return resp
 
@@ -160,7 +162,7 @@ class UspRequestHandler(object):
                     # If the path is full, then just get its value
                     path_result.result_param_map[req_path] = str(self._db.get(req_path))
             except agent_db.NoSuchPathError:
-                self._logger.warn("Invalid Path encountered: {}".format(req_path))
+                self._logger.warning("Invalid Path encountered: %s", req_path)
                 path_result.invalid_path = True
 
             path_result_list.append(path_result)
@@ -187,7 +189,7 @@ class UspRequestHandler(object):
                 items = self._db.find_instances(req_path)
                 path_result.result_path_list.extend(items)
             except agent_db.NoSuchPathError:
-                self._logger.warn("Invalid Path encountered: {}".format(req_path))
+                self._logger.warning("Invalid Path encountered: %s", req_path)
                 path_result.invalid_path = True
 
             path_result_list.append(path_result)
@@ -216,7 +218,7 @@ class UspRequestHandler(object):
                 items = self._db.find_impl_objects(req_path, next_level)
                 path_result.result_path_list.extend(items)
             except agent_db.NoSuchPathError:
-                self._logger.warn("Invalid Path encountered: {}".format(req_path))
+                self._logger.warning("Invalid Path encountered: %s", req_path)
                 path_result.invalid_path = True
 
             path_result_list.append(path_result)
@@ -250,16 +252,16 @@ class UspRequestHandler(object):
                 resp.body.response.operate_resp.operation_result.extend(op_result_list)
             else:
                 # Invalid Command - return an Error
-                err_code = 9000
+                to_id = req.header.from_id
                 err_msg = "Operate Failure: invalid command - {}".format(command)
-                resp = UspMsgGenerator.generate_error(req, self._id,
-                                                      err_code, err_msg)
+                usp_err_msg = utils.UspErrMsg(utils.MessageIdHelper.get_message_id(), to_id, self._id)
+                resp = usp_err_msg.generate_error(9000, err_msg)
         else:
             # Invalid Command - return an Error
-            err_code = 9000
+            to_id = req.header.from_id
             err_msg = "Operate Failure: unknown product class - {}".format(product_class)
-            resp = UspMsgGenerator.generate_error(req, self._id,
-                                                  err_code, err_msg)
+            usp_err_msg = utils.UspErrMsg(utils.MessageIdHelper.get_message_id(), to_id, self._id)
+            resp = usp_err_msg.generate_error(9000, err_msg)
 
         return resp
 

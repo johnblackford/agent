@@ -96,6 +96,10 @@ class AbstractAgent(object):
         """Retrieve the Internal Message Handler"""
         return self._msg_handler
 
+    def get_value_change_notif_poller(self):
+        """Retrieve the Value Change Notification Poller"""
+        return self._value_change_notif_poller
+
     def set_value_change_notif_poller(self, poller):
         """Set the Value Change Notification Poller"""
         self._value_change_notif_poller = poller
