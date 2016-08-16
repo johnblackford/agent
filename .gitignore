@@ -25,6 +25,9 @@ logs/
 database/*.db
 database/*.db-orig
 
+# Ignore the pictures
+pictures/
+
 # Ignore Protocol Buffers generated code
 agent/*_pb2.py
 
