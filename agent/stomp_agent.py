@@ -292,7 +292,7 @@ class StompValueChangeNotifPoller(abstract_agent.AbstractValueChangeNotifPoller)
         return value_change_notif_details_dict
 
 
-    def _handle_value_change(self, param_details_dict, param, value):
+    def _handle_value_change(self, param, value, param_details_dict):
         """Handle the STOMP Value Change Processing"""
         to_id = param_details_dict[self.TO_ID]
         from_id = param_details_dict[self.FROM_ID]
