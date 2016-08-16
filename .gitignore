@@ -23,6 +23,7 @@ logs/
 
 # Ignore the databases
 database/*.db
+database/*.db-orig
 
 # Ignore Protocol Buffers generated code
 agent/*_pb2.py
