@@ -159,7 +159,7 @@ class AbstractAgent(object):
             target_class = self._get_class(product_class, "agent.camera", "PersistRecordedImage")
             self._service_map[product_class] = target_class(camera_image_dir, "image", self._db)
             # Also create and start the Camera Web UI
-            target_ui_class = self._get_class(product_class, "camera_ui", "ThreadedCameraWebUI")
+            target_ui_class = self._get_class(product_class, "agent.camera_ui", "ThreadedCameraWebUI")
             camera_ui = target_ui_class(host="0.0.0.0", directory=camera_image_dir)
             camera_ui.start()
         else:
