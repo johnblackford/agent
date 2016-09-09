@@ -191,7 +191,7 @@ message AddResp {
 
 message Delete {
   bool allow_partial = 1;
-  repeated string param_path = 2;
+  repeated string obj_path = 2;
 }
 
 message DeleteResp {
