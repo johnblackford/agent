@@ -28,7 +28,7 @@
     "Device.Controller.1.Protocol": "STOMP",
     "Device.Controller.1.CoAP.Host": "localhost",
     "Device.Controller.1.CoAP.Port": 15683,
-    "Device.Controller.1.STOMP.Host": "localhost",
+    "Device.Controller.1.STOMP.Host": "stomp.johnblackford.org",
     "Device.Controller.1.STOMP.Port": 61613,
     "Device.Controller.1.STOMP.Username": "jab",
     "Device.Controller.1.STOMP.Password": "johnb23",
