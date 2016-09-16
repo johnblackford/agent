@@ -45,7 +45,6 @@ SOFTWARE.
 #     run()
 #     add_param(param, value_change_notif_details)
 #     remove_param(param)
-#     get_value_change_details(agent_id, controller_id, controller_param_path, subscription_id) :: Abstract Method
 #     _handle_value_change(param, value, notif_details) :: Abstract Method
 #   Class: AbstractNotificationSender(threading.Thread)
 #     __init__(self, notif):
@@ -252,9 +251,8 @@ class AbstractAgent(object):
         """Handle a Subscription for a ValueChange Notification"""
         param_path = self._db.get(subscription_path + "ParamPath")
         if self._value_change_notif_poller is not None:
-            notif_details = self._value_change_notif_poller.get_value_change_details(
-                self._endpoint_id, controller_id, controller_path, subscription_id)
-            self._value_change_notif_poller.add_param(param_path, notif_details)
+            self._value_change_notif_poller.add_param(param_path, self._endpoint_id,
+                                                      controller_id, controller_path, subscription_id)
             self._logger.info("Processed ValueChange Subscription [%s] for Controller [{%s]",
                               subscription_id, controller_id)
         else:
@@ -311,7 +309,12 @@ class AbstractPeriodicNotifHandler(threading.Thread):
 class AbstractValueChangeNotifPoller(threading.Thread):
     """An Abstract Value Change Notification Poller that is extended for specific bindings such that
         ValueChange Notifications can be issued when a Parameter's Value has Changed"""
-    def __init__(self, agent_database, poll_duration):
+    TO_ID = "to.id"
+    FROM_ID = "from.id"
+    CONTROLLER = "controller.path"
+    SUBSCRIPTION_ID = "subscription.id"
+
+    def __init__(self, agent_database, poll_duration=0.5):
         """Initialize the Value Change Notification Poller Thread"""
         threading.Thread.__init__(self, name="ValueChangeNotifPoller")
         self._db = agent_database
@@ -328,7 +331,7 @@ class AbstractValueChangeNotifPoller(threading.Thread):
              send the ValueChange Notification"""
         while True:
             time.sleep(self._poll_duration)
-            self._logger.debug("Polling for Value Changes")
+
             for param in self._param_poll_list:
                 self._logger.debug("Checking %s for a Value Change", param)
                 value = self._db.get(param)
@@ -337,15 +340,26 @@ class AbstractValueChangeNotifPoller(threading.Thread):
                         self._logger.info("Value Change detected for %s", param)
                         self._param_cache[param] = value
                         notif_details = self._notif_details_dict[param]
-                        self._handle_value_change(param, value, notif_details)
+                        to_id = notif_details[self.TO_ID]
+                        from_id = notif_details[self.FROM_ID]
+                        subscription_id = notif_details[self.SUBSCRIPTION_ID]
+                        controller_param_path = notif_details[self.CONTROLLER]
+                        self._handle_value_change(param, value, to_id, from_id,
+                                                  subscription_id, controller_param_path)
 
-    def add_param(self, param, value_change_notif_details):
+    def add_param(self, param, agent_id, controller_id, controller_param_path, subscription_id):
         """Add a Parameter to the Polling List"""
         self._logger.info("Adding %s to the ValueChange Notification Poller", param)
+        value_change_notif_details_dict = {}
+        value_change_notif_details_dict[self.FROM_ID] = agent_id
+        value_change_notif_details_dict[self.TO_ID] = controller_id
+        value_change_notif_details_dict[self.SUBSCRIPTION_ID] = subscription_id
+        value_change_notif_details_dict[self.CONTROLLER] = controller_param_path
+
         with self._cache_lock:
             self._param_cache[param] = self._db.get(param)
             self._param_poll_list.append(param)
-            self._notif_details_dict[param] = value_change_notif_details
+            self._notif_details_dict[param] = value_change_notif_details_dict
 
     def remove_param(self, param):
         """Remove a Parameter from the Polling List"""
@@ -355,12 +369,8 @@ class AbstractValueChangeNotifPoller(threading.Thread):
             self._param_poll_list.remove(param)
             del self._notif_details_dict[param]
 
-    def get_value_change_details(self, agent_id, controller_id, controller_param_path, subscription_id):
-        """Return a Dictionary containing the binding details needed to issue the Value Change Notification"""
-        raise NotImplementedError()
 
-
-    def _handle_value_change(self, param, value, notif_details):
+    def _handle_value_change(self, param, value, to_id, from_id, subscription_id, controller_param_path):
         """Handle the Binding Specific Value Change Processing"""
         raise NotImplementedError()
 

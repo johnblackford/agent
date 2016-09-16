@@ -58,7 +58,7 @@ from agent import stomp_usp_binding
 
 
 class StompAgent(abstract_agent.AbstractAgent):
-    """A STOMP USP Agent"""
+    """A USP Agent that uses the STOMP Binding"""
     def __init__(self, dm_file, db_file, cfg_file_name="cfg/agent.json", debug=False):
         """Initialize the STOMP Agent"""
         abstract_agent.AbstractAgent.__init__(self, dm_file, db_file, cfg_file_name, debug)
@@ -257,13 +257,8 @@ class StompPeriodicNotifHandler(abstract_agent.AbstractPeriodicNotifHandler):
 
 class StompValueChangeNotifPoller(abstract_agent.AbstractValueChangeNotifPoller):
     """Poll Parameters for Value Change Notifications via a STOMP Binding"""
-    TO_ID = "to.id"
-    FROM_ID = "from.id"
-    CONTROLLER = "controller.path"
-    SUBSCRIPTION_ID = "subscription.id"
-
     def __init__(self, agent_db, poll_duration=0.5):
-        """Initialize the STOMP Value Change Notification Poller Thread"""
+        """Initialize the STOMP Value Change Notification Poller"""
         abstract_agent.AbstractValueChangeNotifPoller.__init__(self, agent_db, poll_duration)
         self._binding_dict = {}
 
@@ -276,28 +271,9 @@ class StompValueChangeNotifPoller(abstract_agent.AbstractValueChangeNotifPoller)
         """Remove a STOMP Binding"""
         del self._binding_dict[controller_param_path]
 
-    def get_value_change_details(self, agent_id, controller_id, controller_param_path, subscription_id):
-        """Add a STOMP Parameter to the Polling List"""
-        value_change_notif_details_dict = {}
 
-        if controller_param_path not in self._binding_dict:
-            self._logger.warning("Attempted to retrieve Value Change Details for an unknown Controller [%s]",
-                                 controller_param_path)
-
-        value_change_notif_details_dict[self.FROM_ID] = agent_id
-        value_change_notif_details_dict[self.TO_ID] = controller_id
-        value_change_notif_details_dict[self.SUBSCRIPTION_ID] = subscription_id
-        value_change_notif_details_dict[self.CONTROLLER] = controller_param_path
-
-        return value_change_notif_details_dict
-
-
-    def _handle_value_change(self, param, value, param_details_dict):
+    def _handle_value_change(self, param, value, to_id, from_id, subscription_id, controller_param_path):
         """Handle the STOMP Value Change Processing"""
-        to_id = param_details_dict[self.TO_ID]
-        from_id = param_details_dict[self.FROM_ID]
-        subscription_id = param_details_dict[self.SUBSCRIPTION_ID]
-        controller_param_path = param_details_dict[self.CONTROLLER]
         notif = notify.ValueChangeNotification(from_id, to_id, subscription_id, param, value)
 
         if controller_param_path in self._binding_dict:
@@ -314,7 +290,7 @@ class StompValueChangeNotifPoller(abstract_agent.AbstractValueChangeNotifPoller)
 class StompNotificationSender(abstract_agent.AbstractNotificationSender):
     """Send a Notification via a STOMP Binding"""
     def __init__(self, notif, binding, to_id):
-        """Initialize the STOMP Notification Issuer Thread"""
+        """Initialize the STOMP Notification Sender"""
         abstract_agent.AbstractNotificationSender.__init__(self, notif)
         self._to_id = to_id
         self._binding = binding

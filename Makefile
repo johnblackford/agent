@@ -22,5 +22,8 @@ lint:
 run:
 	python3 -m agent.main -t test
 
-run2:
+runbin:
 	python3 bin/agent.py -t test
+
+runcoap:
+	python3 bin/agent.py -t test -c

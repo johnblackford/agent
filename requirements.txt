@@ -1,3 +1,4 @@
+aiocoap==0.2
 bottle==0.12.9
 cov-core==1.15.0
 coverage==4.2
