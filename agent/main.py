@@ -34,23 +34,25 @@ SOFTWARE.
 import logging
 import argparse
 
+from agent import coap_agent
 from agent import stomp_agent
 
 
 
-class Agent(stomp_agent.StompAgent):
-    """A STOMP Agent Wrapper"""
+class Agent(object):
+    """A USP Agent Wrapper"""
     def __init__(self, cfg_file_name, log_file_name, log_level=logging.INFO, debug=False):
         """Initialize the Agent"""
         logging.basicConfig(filename=log_file_name, level=log_level,
                             format='%(asctime)-15s %(name)s %(levelname)-8s %(message)s')
 
-        logging.info("#######################################################")
-        logging.info("## Starting a USP Agent                              ##")
-        logging.info("#######################################################")
-
         # Handle Command Line Arguments
         parser = argparse.ArgumentParser()
+        parser.add_argument("-c", "--coap", action="store_true",
+                            help="use the CoAP Binding instead of the STOMP Binding")
+        parser.add_argument("--coap-port", action="store", nargs="?",
+                            type=int, default=5683,
+                            help="specify the CoAP Port to listen on")
         parser.add_argument("-t", "--client-type", action="store", nargs="?",
                             default="test",
                             help="specify the type of client (e.g. test, camera, motion)")
@@ -59,13 +61,29 @@ class Agent(stomp_agent.StompAgent):
                             help="show the version of this tool")
         args = parser.parse_args()
         client_type = args.client_type
+        use_coap = args.coap
+        coap_port = args.coap_port
 
         dm_file_name = "database/{}-dm.json".format(client_type)
         db_file_name = "database/{}.db".format(client_type)
 
-        stomp_agent.StompAgent.__init__(self, dm_file_name, db_file_name, cfg_file_name, debug)
-        self.start_listening()
-        self.clean_up()
+        if use_coap:
+            logging.info("#######################################################")
+            logging.info("## Starting a CoAP USP Agent                         ##")
+            logging.info("#######################################################")
+
+            my_coap_agent = coap_agent.CoapAgent(dm_file_name, db_file_name, coap_port, cfg_file_name, debug)
+            my_coap_agent.start_listening()
+            my_coap_agent.clean_up()
+        else:
+            logging.info("#######################################################")
+            logging.info("## Starting a STOMP USP Agent                        ##")
+            logging.info("#######################################################")
+
+            my_stomp_agent = stomp_agent.StompAgent(dm_file_name, db_file_name, cfg_file_name, debug)
+            my_stomp_agent.start_listening()
+            my_stomp_agent.clean_up()
+
 
 
 def main():
