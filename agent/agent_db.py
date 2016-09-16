@@ -127,10 +127,10 @@ class Database(object):
         logger = logging.getLogger(self.__class__.__name__)
 
         # Turn the incoming path into a regex to validate it is in the implemented data model
-        dm_regex_str = "^" + path
-        dm_regex_str = re.sub(r'\.', r'\.', dm_regex_str)
-        dm_regex_str = re.sub(r'\{(.+?)\}', '{i}', dm_regex_str)
-        dm_regex_str = re.sub(r'\*', '.+', dm_regex_str)
+        dm_regex_str = "^" + path                                     # Starts with
+        dm_regex_str = re.sub(r'\.[0-9]+\.', r'.{i}.', dm_regex_str)  # Instance Number Addressing
+        dm_regex_str = re.sub(r'\.\*\.', r'.{i}.', dm_regex_str)      # Wild-card Searching
+        dm_regex_str = re.sub(r'\.', r'\.', dm_regex_str)             # Replace '.' with explicit '.' search
         if path.endswith("."):
             dm_regex_str = dm_regex_str + ".*"
         logger.debug("find_params: Using regex \"%s\" to validate Path [%s] is in the Implemented Data Model",
