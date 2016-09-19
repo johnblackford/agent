@@ -170,6 +170,11 @@ def get_dm_file_contents():
     return dm_contents
 
 
+"""
+ Tests for find_params
+"""
+
+
 def test_find_param_static_path():
     my_mock = dm_mock = mock.mock_open(read_data=get_dm_file_contents())
     db_mock = mock.mock_open(read_data=get_db_file_contents())
@@ -185,6 +190,7 @@ def test_find_param_static_path():
     assert len(found_param_list2) == 1
     assert "Device.LocalAgent.SupportedProtocols" in found_param_list2
 
+
 def test_find_param_static_path_exception():
     my_mock = dm_mock = mock.mock_open(read_data=get_dm_file_contents())
     db_mock = mock.mock_open(read_data=get_db_file_contents())
@@ -194,9 +200,10 @@ def test_find_param_static_path_exception():
         my_db = agent_db.Database("database/test-dm.json", "mock_db.json")
         try:
             my_db.find_params("Device.NoSuchParameter")
-            assert True, "NoSuchPathErrorExcepted"
+            assert True, "NoSuchPathError Excepted"
         except agent_db.NoSuchPathError:
             pass
+
 
 def test_find_param_instance_number_addressing():
     my_mock = dm_mock = mock.mock_open(read_data=get_dm_file_contents())
@@ -216,6 +223,7 @@ def test_find_param_instance_number_addressing():
     assert len(found_param_list3) == 1
     assert "Device.Services.HomeAutomation.1.Camera.1.Pic.10.URL" in found_param_list3
 
+
 def test_find_param_instance_number_addressing_no_instance():
     my_mock = dm_mock = mock.mock_open(read_data=get_dm_file_contents())
     db_mock = mock.mock_open(read_data=get_db_file_contents())
@@ -226,6 +234,7 @@ def test_find_param_instance_number_addressing_no_instance():
         found_param_list1 = my_db.find_params("Device.Services.HomeAutomation.1.Camera.1.Pic.1.URL")
 
     assert len(found_param_list1) == 0
+
 
 def test_find_param_wildcard_searching():
     my_mock = dm_mock = mock.mock_open(read_data=get_dm_file_contents())
@@ -255,3 +264,124 @@ def test_find_param_wildcard_searching():
     assert "Device.Services.HomeAutomation.1.Camera.2.Pic.90.URL" in found_param_list4
     assert "Device.Services.HomeAutomation.1.Camera.2.Pic.100.URL" in found_param_list4
 
+
+"""
+ Tests for find_instances
+"""
+
+
+def test_find_instances_invalid_param():
+    my_mock = dm_mock = mock.mock_open(read_data=get_dm_file_contents())
+    db_mock = mock.mock_open(read_data=get_db_file_contents())
+    my_mock.side_effect = [dm_mock.return_value, db_mock.return_value]
+
+    with mock.patch("builtins.open", my_mock):
+        my_db = agent_db.Database("database/test-dm.json", "mock_db.json")
+        try:
+            my_db.find_instances("Device.NoSuchParameter")
+            assert True, "NoSuchPathError Excepted"
+        except agent_db.NoSuchPathError:
+            pass
+
+
+def test_find_instances_full_path():
+    my_mock = dm_mock = mock.mock_open(read_data=get_dm_file_contents())
+    db_mock = mock.mock_open(read_data=get_db_file_contents())
+    my_mock.side_effect = [dm_mock.return_value, db_mock.return_value]
+
+    with mock.patch("builtins.open", my_mock):
+        my_db = agent_db.Database("database/test-dm.json", "mock_db.json")
+        try:
+            my_db.find_instances("Device.ControllerNumberOfEntries")
+            assert True, "NoSuchPathError Excepted"
+        except agent_db.NoSuchPathError:
+            pass
+
+
+def test_find_instances_static_table():
+    my_mock = dm_mock = mock.mock_open(read_data=get_dm_file_contents())
+    db_mock = mock.mock_open(read_data=get_db_file_contents())
+    my_mock.side_effect = [dm_mock.return_value, db_mock.return_value]
+
+    with mock.patch("builtins.open", my_mock):
+        my_db = agent_db.Database("database/test-dm.json", "mock_db.json")
+        found_instances_list1 = my_db.find_instances("Device.Controller.")
+        found_instances_list2 = my_db.find_instances("Device.Subscription.")
+
+    assert len(found_instances_list1) == 2
+    assert "Device.Controller.1." in found_instances_list1
+    assert "Device.Controller.2." in found_instances_list1
+    assert len(found_instances_list2) == 4
+    assert "Device.Subscription.1." in found_instances_list2
+    assert "Device.Subscription.2." in found_instances_list2
+    assert "Device.Subscription.3." in found_instances_list2
+    assert "Device.Subscription.4." in found_instances_list2
+
+
+def test_find_instances_instance_number_addressing():
+    my_mock = dm_mock = mock.mock_open(read_data=get_dm_file_contents())
+    db_mock = mock.mock_open(read_data=get_db_file_contents())
+    my_mock.side_effect = [dm_mock.return_value, db_mock.return_value]
+
+    with mock.patch("builtins.open", my_mock):
+        my_db = agent_db.Database("database/test-dm.json", "mock_db.json")
+        found_instances_list1 = my_db.find_instances("Device.Services.HomeAutomation.1.Camera.2.Pic.")
+
+    assert len(found_instances_list1) == 3
+    assert "Device.Services.HomeAutomation.1.Camera.2.Pic.10." in found_instances_list1
+    assert "Device.Services.HomeAutomation.1.Camera.2.Pic.90." in found_instances_list1
+    assert "Device.Services.HomeAutomation.1.Camera.2.Pic.100." in found_instances_list1
+
+
+def test_find_instances_instance_number_addressing_no_instance():
+    my_mock = dm_mock = mock.mock_open(read_data=get_dm_file_contents())
+    db_mock = mock.mock_open(read_data=get_db_file_contents())
+    my_mock.side_effect = [dm_mock.return_value, db_mock.return_value]
+
+    with mock.patch("builtins.open", my_mock):
+        my_db = agent_db.Database("database/test-dm.json", "mock_db.json")
+        found_instances_list1 = my_db.find_instances("Device.Services.HomeAutomation.1.Camera.3.Pic.")
+
+    assert len(found_instances_list1) == 0
+
+
+def test_find_instances_wildcard_searching():
+    my_mock = dm_mock = mock.mock_open(read_data=get_dm_file_contents())
+    db_mock = mock.mock_open(read_data=get_db_file_contents())
+    my_mock.side_effect = [dm_mock.return_value, db_mock.return_value]
+
+    with mock.patch("builtins.open", my_mock):
+        my_db = agent_db.Database("database/test-dm.json", "mock_db.json")
+        found_instances_list1 = my_db.find_instances("Device.Services.HomeAutomation.1.Camera.*.Pic.")
+
+    assert len(found_instances_list1) == 5
+    assert "Device.Services.HomeAutomation.1.Camera.1.Pic.9." in found_instances_list1
+    assert "Device.Services.HomeAutomation.1.Camera.1.Pic.10." in found_instances_list1
+    assert "Device.Services.HomeAutomation.1.Camera.2.Pic.10." in found_instances_list1
+    assert "Device.Services.HomeAutomation.1.Camera.2.Pic.90." in found_instances_list1
+    assert "Device.Services.HomeAutomation.1.Camera.2.Pic.100." in found_instances_list1
+
+
+"""
+ Tests for find_impl_objects
+"""
+
+"""
+ Tests for get
+   NOTE: Might need to mock: time.time(), datetime.datetime.now(), utils.IPAddr.get_ip_addr()
+"""
+
+"""
+ Tests for update
+   NOTE: Mocking the _save method
+"""
+
+"""
+ Tests for insert
+   NOTE: Mocking the _save method
+"""
+
+"""
+ Tests for delete
+   NOTE: Mocking the _save method
+"""

@@ -138,8 +138,9 @@ class Database(object):
 
         # Turn the incoming path into a regex to get the matching paths
         db_regex_str = "^" + path
+        # Assuming that the internal storage is instance number based
+        db_regex_str = re.sub(r'\.\*\.', r'.[0-9]+.', db_regex_str)
         db_regex_str = re.sub(r'\.', r'\.', db_regex_str)
-        db_regex_str = re.sub(r'\*', '.+', db_regex_str)
         if path.endswith("."):
             db_regex_str = db_regex_str + ".*"
         logger.debug("find_params: Using regex \"%s\" to retrieve values from the Database for Path [%s]",
@@ -166,25 +167,24 @@ class Database(object):
     def find_instances(self, partial_path):
         """Retrieve a set of object instance paths that match the incoming path"""
         found_keys = []
-        db_regex_str = None
-        dm_regex_str = None
         is_implemented_path = False
         logger = logging.getLogger(self.__class__.__name__)
 
         if partial_path.endswith("."):
             # Turn the incoming path into a regex to validate it is in the implemented data model
-            dm_regex_str = "^" + partial_path
-            dm_regex_str = re.sub(r'\.', r'\.', dm_regex_str)
-            dm_regex_str = re.sub(r'\{(.+?)\}', '{i}', dm_regex_str)
-            dm_regex_str = re.sub(r'\*', '.+', dm_regex_str)
+            dm_regex_str = "^" + partial_path  # Starts with
+            dm_regex_str = re.sub(r'\.[0-9]+\.', r'.{i}.', dm_regex_str)  # Instance Number Addressing
+            dm_regex_str = re.sub(r'\.\*\.', r'.{i}.', dm_regex_str)  # Wild-card Searching
+            dm_regex_str = re.sub(r'\.', r'\.', dm_regex_str)  # Replace '.' with explicit '.' search
             dm_regex_str = dm_regex_str + ".*"
             logger.debug("find_instances: Using regex \"%s\" to validate Path [%s] is in the Implemented Data Model",
                          dm_regex_str, partial_path)
 
             # Turn the incoming path into a regex to get the matching paths
             db_regex_str = "^" + partial_path
+            # Assuming that the internal storage is instance number based
+            db_regex_str = re.sub(r'\.\*\.', r'.[0-9]+.', db_regex_str)
             db_regex_str = re.sub(r'\.', r'\.', db_regex_str)
-            db_regex_str = re.sub(r'\*', '.+', db_regex_str)
             db_regex_str = db_regex_str + ".*"
             logger.debug("find_instances: Using regex \"%s\" to retrieve values from the Database for Path [%s]",
                          db_regex_str, partial_path)
@@ -195,8 +195,7 @@ class Database(object):
         partial_path_part_len = len(partial_path.split(".")) - 1
 
         # Validate that path is in the Implemented Data Model
-        dm_keys = self._dm.keys()
-        for dm_key in dm_keys:
+        for dm_key in self._dm:
             if re.fullmatch(dm_regex_str, dm_key) is not None:
                 # Validate that the partial_path is a multi-instance object
                 dm_key_parts = dm_key.split(".")
@@ -206,18 +205,17 @@ class Database(object):
 
         # If the path is Valid then retrieve the matching paths
         if is_implemented_path:
-            db_keys = self._db.keys()
-            for key in db_keys:
-                found_key = ""
-
-                if re.fullmatch(db_regex_str, key) is not None:
+            for path in self._db:
+                if re.fullmatch(db_regex_str, path) is not None:
                     # We only want the path to the next level (instance identifiers)
-                    key_parts = key.split(".")
-                    found_key = partial_path + key_parts[partial_path_part_len] + "."
+                    path_parts = path.split(".")
+                    built_path = self._build_find_instances_path(path_parts, partial_path_part_len)
+                    found_key = built_path + path_parts[partial_path_part_len] + "."
 
-                    # Only add it to found_keys if we haven't do so already
-                    if found_key not in found_keys:
-                        found_keys.append(found_key)
+                    if not self._is_meta_parameter(path_parts, partial_path_part_len):
+                        # Only add it to found_keys if we haven't do so already
+                        if found_key not in found_keys:
+                            found_keys.append(found_key)
         else:
             raise NoSuchPathError(partial_path)
 
@@ -337,6 +335,25 @@ class Database(object):
         with self._file_write_lock:
             with open(self._db_filename, "w") as db_file:
                 json.dump(self._db, db_file)
+
+    def _build_find_instances_path(self, path_parts, partial_path_part_len):
+        """Build a search path from the tokenized path (path parts)"""
+        built_path = ""
+        built_path_part_count = 0
+
+        # We only want the path to the next level (instance identifiers)
+        for part in path_parts:
+            built_path_part_count += 1
+            built_path = built_path + part + "."
+            if built_path_part_count == partial_path_part_len:
+                break
+
+        return built_path
+
+    def _is_meta_parameter(self, path_parts, partial_path_part_len):
+        """Determine if the parameter is a meta parameter"""
+        return path_parts[partial_path_part_len].startswith("__") and \
+               path_parts[partial_path_part_len].endswith("__")
 
 
 
