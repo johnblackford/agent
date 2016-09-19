@@ -127,22 +127,12 @@ class Database(object):
         logger = logging.getLogger(self.__class__.__name__)
 
         # Turn the incoming path into a regex to validate it is in the implemented data model
-        dm_regex_str = "^" + path                                     # Starts with
-        dm_regex_str = re.sub(r'\.[0-9]+\.', r'.{i}.', dm_regex_str)  # Instance Number Addressing
-        dm_regex_str = re.sub(r'\.\*\.', r'.{i}.', dm_regex_str)      # Wild-card Searching
-        dm_regex_str = re.sub(r'\.', r'\.', dm_regex_str)             # Replace '.' with explicit '.' search
-        if path.endswith("."):
-            dm_regex_str = dm_regex_str + ".*"
+        dm_regex_str = self._dm_regex(path, path.endswith("."))
         logger.debug("find_params: Using regex \"%s\" to validate Path [%s] is in the Implemented Data Model",
                      dm_regex_str, path)
 
         # Turn the incoming path into a regex to get the matching paths
-        db_regex_str = "^" + path
-        # Assuming that the internal storage is instance number based
-        db_regex_str = re.sub(r'\.\*\.', r'.[0-9]+.', db_regex_str)
-        db_regex_str = re.sub(r'\.', r'\.', db_regex_str)
-        if path.endswith("."):
-            db_regex_str = db_regex_str + ".*"
+        db_regex_str = self._db_regex(path, path.endswith("."))
         logger.debug("find_params: Using regex \"%s\" to retrieve values from the Database for Path [%s]",
                      db_regex_str, path)
 
@@ -172,20 +162,12 @@ class Database(object):
 
         if partial_path.endswith("."):
             # Turn the incoming path into a regex to validate it is in the implemented data model
-            dm_regex_str = "^" + partial_path  # Starts with
-            dm_regex_str = re.sub(r'\.[0-9]+\.', r'.{i}.', dm_regex_str)  # Instance Number Addressing
-            dm_regex_str = re.sub(r'\.\*\.', r'.{i}.', dm_regex_str)  # Wild-card Searching
-            dm_regex_str = re.sub(r'\.', r'\.', dm_regex_str)  # Replace '.' with explicit '.' search
-            dm_regex_str = dm_regex_str + ".*"
+            dm_regex_str = self._dm_regex(partial_path, True)
             logger.debug("find_instances: Using regex \"%s\" to validate Path [%s] is in the Implemented Data Model",
                          dm_regex_str, partial_path)
 
             # Turn the incoming path into a regex to get the matching paths
-            db_regex_str = "^" + partial_path
-            # Assuming that the internal storage is instance number based
-            db_regex_str = re.sub(r'\.\*\.', r'.[0-9]+.', db_regex_str)
-            db_regex_str = re.sub(r'\.', r'\.', db_regex_str)
-            db_regex_str = db_regex_str + ".*"
+            db_regex_str = self._db_regex(partial_path, True)
             logger.debug("find_instances: Using regex \"%s\" to retrieve values from the Database for Path [%s]",
                          db_regex_str, partial_path)
         else:
@@ -231,12 +213,13 @@ class Database(object):
 
         if partial_path.endswith("."):
             # Turn the incoming path into a regex to validate it is in the implemented data model
-            dm_regex_str = "^" + partial_path
-            dm_regex_str = re.sub(r'\.\d\.', '.{i}.', dm_regex_str)
-            dm_regex_str = re.sub(r'\.', r'\.', dm_regex_str)
-            dm_regex_str = re.sub(r'\{(.+?)\}', '{i}', dm_regex_str)
-            dm_regex_str = re.sub(r'\*', '.+', dm_regex_str)
-            dm_regex_str = dm_regex_str + ".*"
+            dm_regex_str = self._dm_regex(partial_path, True)
+#            dm_regex_str = "^" + partial_path
+#            dm_regex_str = re.sub(r'\.\d\.', '.{i}.', dm_regex_str)
+#            dm_regex_str = re.sub(r'\.', r'\.', dm_regex_str)
+#            dm_regex_str = re.sub(r'\{(.+?)\}', '{i}', dm_regex_str)
+#            dm_regex_str = re.sub(r'\*', '.+', dm_regex_str)
+#            dm_regex_str = dm_regex_str + ".*"
             logger.debug("find_impl_objects: Using regex \"%s\" to validate Path [%s] is in the Implemented Data Model",
                          dm_regex_str, partial_path)
         else:
@@ -279,7 +262,6 @@ class Database(object):
 
     def insert(self, partial_path):
         """Insert a new record in the table"""
-        next_inst_num = -1
         logger = logging.getLogger(self.__class__.__name__)
 
         if len(self.find_impl_objects(partial_path, True)) > 0:
@@ -315,7 +297,7 @@ class Database(object):
             dm_regex_str = partial_path
             dm_regex_str = re.sub(r'\{(.+?)\}', '{i}', dm_regex_str)
             dm_regex_str = re.sub(r'\.\d\.', '.{i}.', dm_regex_str)
-            logger.debug("insert: Using regex \"%s\" to validate Path [%s] is in the Supported Insert Path List",
+            logger.debug("delete: Using regex \"%s\" to validate Path [%s] is in the Supported Insert Path List",
                          dm_regex_str, partial_path)
 
             if dm_regex_str in self._supported_delete_path_list:
@@ -330,11 +312,29 @@ class Database(object):
             raise NoSuchPathError(partial_path)
 
 
-    def _save(self):
-        """Save the contents of the DB back into the File"""
-        with self._file_write_lock:
-            with open(self._db_filename, "w") as db_file:
-                json.dump(self._db, db_file)
+    def _db_regex(self, path, partial_path):
+        """Generate a regex for determining whether or note a path is in the DB"""
+        db_regex_str = "^" + path
+        # Assuming that the internal storage is instance number based
+        db_regex_str = re.sub(r'\.\*\.', r'.[0-9]+.', db_regex_str)
+        db_regex_str = re.sub(r'\.', r'\.', db_regex_str)
+
+        if partial_path:
+            db_regex_str = db_regex_str + ".*"
+
+        return db_regex_str
+
+    def _dm_regex(self, path, partial_path):
+        """Generate a regex for determining whether or not a path is in the DM"""
+        dm_regex_str = "^" + path  # Starts with
+        dm_regex_str = re.sub(r'\.[0-9]+\.', r'.{i}.', dm_regex_str)  # Instance Number Addressing
+        dm_regex_str = re.sub(r'\.\*\.', r'.{i}.', dm_regex_str)  # Wild-card Searching
+        dm_regex_str = re.sub(r'\.', r'\.', dm_regex_str)  # Replace '.' with explicit '.' search
+
+        if partial_path:
+            dm_regex_str = dm_regex_str + ".*"
+
+        return dm_regex_str
 
     def _build_find_instances_path(self, path_parts, partial_path_part_len):
         """Build a search path from the tokenized path (path parts)"""
@@ -355,6 +355,11 @@ class Database(object):
         return path_parts[partial_path_part_len].startswith("__") and \
                path_parts[partial_path_part_len].endswith("__")
 
+    def _save(self):
+        """Save the contents of the DB back into the File"""
+        with self._file_write_lock:
+            with open(self._db_filename, "w") as db_file:
+                json.dump(self._db, db_file)
 
 
 
