@@ -191,7 +191,7 @@ class Database(object):
                 if re.fullmatch(db_regex_str, path) is not None:
                     # We only want the path to the next level (instance identifiers)
                     path_parts = path.split(".")
-                    built_path = self._build_find_instances_path(path_parts, partial_path_part_len)
+                    built_path = self._build_path_from_parts(path_parts, partial_path_part_len)
                     found_key = built_path + path_parts[partial_path_part_len] + "."
 
                     if not self._is_meta_parameter(path_parts, partial_path_part_len):
@@ -207,9 +207,9 @@ class Database(object):
     def find_impl_objects(self, partial_path, next_level):
         """Retrieve a set of implemented object paths that match the incoming path"""
         found_keys = []
-        dm_regex_str = None
         is_implemented_path = False
         logger = logging.getLogger(self.__class__.__name__)
+        generic_partial_path = self._generic_dm_path(partial_path)
 
         if partial_path.endswith("."):
             # Turn the incoming path into a regex to validate it is in the implemented data model
@@ -220,8 +220,9 @@ class Database(object):
 #            dm_regex_str = re.sub(r'\{(.+?)\}', '{i}', dm_regex_str)
 #            dm_regex_str = re.sub(r'\*', '.+', dm_regex_str)
 #            dm_regex_str = dm_regex_str + ".*"
-            logger.debug("find_impl_objects: Using regex \"%s\" to validate Path [%s] is in the Implemented Data Model",
-                         dm_regex_str, partial_path)
+            logger.debug(
+                "find_impl_objects: Using regex \"%s\" to validate Path [%s] is in the Implemented Data Model",
+                dm_regex_str, partial_path)
         else:
             raise NoSuchPathError(partial_path)
 
@@ -229,30 +230,35 @@ class Database(object):
         partial_path_part_len = len(partial_path.split(".")) - 1
 
         # Validate that path is in the Implemented Data Model
-        dm_keys = self._dm.keys()
-        for dm_key in dm_keys:
+        for dm_key in self._dm:
             if re.fullmatch(dm_regex_str, dm_key) is not None:
-                found_key = ""
+                found_key = None
                 key_parts = dm_key.split(".")
                 key_parts_len = len(key_parts)
                 is_implemented_path = True
 
                 if next_level:
-                    found_key = partial_path + key_parts[partial_path_part_len] + "."
+                    if key_parts_len > partial_path_part_len + 1:
+                        built_path = self._build_path_from_parts(key_parts, partial_path_part_len)
+                        found_key = built_path + key_parts[partial_path_part_len] + "."
 
                     # Only add it to found_keys if we haven't done so already
-                    if found_key not in found_keys:
-                        found_keys.append(found_key)
+#                    if found_key not in found_keys:
+#                        found_keys.append(found_key)
                 else:
                     inx = 0
+                    found_key = ""
                     while inx < (key_parts_len - 1):
                         found_key += key_parts[inx]
                         found_key += "."
                         inx += 1
 
-                    # Only add it to found_keys if we haven't do so already
+                # Only add it to found_keys if we haven't done so already
+                if found_key is not None:
                     if found_key not in found_keys:
-                        found_keys.append(found_key)
+                        # Don't add the incoming partial_path
+                        if not found_key == generic_partial_path:
+                            found_keys.append(found_key)
 
         # If the path is Valid then retrieve the matching paths
         if not is_implemented_path:
@@ -336,7 +342,14 @@ class Database(object):
 
         return dm_regex_str
 
-    def _build_find_instances_path(self, path_parts, partial_path_part_len):
+    def _generic_dm_path(self, path):
+        """Turn a DM Path into a Generic one by replacing instance numbers and wildcards"""
+        generic_path = re.sub(r'\.[0-9]+\.', r'.{i}.', path)  # Instance Number Addressing
+        generic_path = re.sub(r'\.\*\.', r'.{i}.', generic_path)  # Wild-card Searching
+
+        return generic_path
+
+    def _build_path_from_parts(self, path_parts, partial_path_part_len):
         """Build a search path from the tokenized path (path parts)"""
         built_path = ""
         built_path_part_count = 0

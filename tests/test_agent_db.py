@@ -270,7 +270,7 @@ def test_find_param_wildcard_searching():
 """
 
 
-def test_find_instances_invalid_param():
+def test_find_instances_invalid_obj():
     my_mock = dm_mock = mock.mock_open(read_data=get_dm_file_contents())
     db_mock = mock.mock_open(read_data=get_db_file_contents())
     my_mock.side_effect = [dm_mock.return_value, db_mock.return_value]
@@ -278,7 +278,7 @@ def test_find_instances_invalid_param():
     with mock.patch("builtins.open", my_mock):
         my_db = agent_db.Database("database/test-dm.json", "mock_db.json")
         try:
-            my_db.find_instances("Device.NoSuchParameter")
+            my_db.find_instances("Device.NoSuchObj.")
             assert True, "NoSuchPathError Excepted"
         except agent_db.NoSuchPathError:
             pass
@@ -366,20 +366,234 @@ def test_find_instances_wildcard_searching():
  Tests for find_impl_objects
 """
 
+
+def test_find_impl_objects_invalid_obj():
+    my_mock = dm_mock = mock.mock_open(read_data=get_dm_file_contents())
+    db_mock = mock.mock_open(read_data=get_db_file_contents())
+    my_mock.side_effect = [dm_mock.return_value, db_mock.return_value]
+
+    with mock.patch("builtins.open", my_mock):
+        my_db = agent_db.Database("database/test-dm.json", "mock_db.json")
+        try:
+            my_db.find_impl_objects("Device.NoSuchObj.", False)
+            assert True, "NoSuchPathError Excepted"
+        except agent_db.NoSuchPathError:
+            pass
+
+
+def test_find_impl_objects_invalid_obj_next_level():
+    my_mock = dm_mock = mock.mock_open(read_data=get_dm_file_contents())
+    db_mock = mock.mock_open(read_data=get_db_file_contents())
+    my_mock.side_effect = [dm_mock.return_value, db_mock.return_value]
+
+    with mock.patch("builtins.open", my_mock):
+        my_db = agent_db.Database("database/test-dm.json", "mock_db.json")
+        try:
+            my_db.find_impl_objects("Device.NoSuchObj.", True)
+            assert True, "NoSuchPathError Excepted"
+        except agent_db.NoSuchPathError:
+            pass
+
+
+def test_find_impl_objects_full_path():
+    my_mock = dm_mock = mock.mock_open(read_data=get_dm_file_contents())
+    db_mock = mock.mock_open(read_data=get_db_file_contents())
+    my_mock.side_effect = [dm_mock.return_value, db_mock.return_value]
+
+    with mock.patch("builtins.open", my_mock):
+        my_db = agent_db.Database("database/test-dm.json", "mock_db.json")
+        try:
+            my_db.find_impl_objects("Device.ControllerNumberOfEntries", False)
+            assert True, "NoSuchPathError Excepted"
+        except agent_db.NoSuchPathError:
+            pass
+
+
+def test_find_impl_objects_full_path_next_level():
+    my_mock = dm_mock = mock.mock_open(read_data=get_dm_file_contents())
+    db_mock = mock.mock_open(read_data=get_db_file_contents())
+    my_mock.side_effect = [dm_mock.return_value, db_mock.return_value]
+
+    with mock.patch("builtins.open", my_mock):
+        my_db = agent_db.Database("database/test-dm.json", "mock_db.json")
+        try:
+            my_db.find_impl_objects("Device.ControllerNumberOfEntries", True)
+            assert True, "NoSuchPathError Excepted"
+        except agent_db.NoSuchPathError:
+            pass
+
+
+def test_find_impl_objects_static_table():
+    my_mock = dm_mock = mock.mock_open(read_data=get_dm_file_contents())
+    db_mock = mock.mock_open(read_data=get_db_file_contents())
+    my_mock.side_effect = [dm_mock.return_value, db_mock.return_value]
+
+    with mock.patch("builtins.open", my_mock):
+        my_db = agent_db.Database("database/test-dm.json", "mock_db.json")
+        found_objects_list1 = my_db.find_impl_objects("Device.Controller.{i}.", False)
+        found_objects_list2 = my_db.find_impl_objects("Device.Subscription.", False)
+        found_objects_list3 = my_db.find_impl_objects("Device.Services.", False)
+
+    assert len(found_objects_list1) == 2
+    assert "Device.Controller.{i}.CoAP." in found_objects_list1
+    assert "Device.Controller.{i}.STOMP." in found_objects_list1
+    assert len(found_objects_list2) == 1
+    assert "Device.Subscription.{i}." in found_objects_list2
+    assert len(found_objects_list3) == 3
+#    assert "Device.Services.HomeAutomation." in found_objects_list3
+    assert "Device.Services.HomeAutomation.{i}." in found_objects_list3
+#    assert "Device.Services.HomeAutomation.{i}.Camera." in found_objects_list3
+    assert "Device.Services.HomeAutomation.{i}.Camera.{i}." in found_objects_list3
+#    assert "Device.Services.HomeAutomation.{i}.Camera..{i}.Pic." in found_objects_list3
+    assert "Device.Services.HomeAutomation.{i}.Camera.{i}.Pic.{i}." in found_objects_list3
+
+
+def test_find_impl_objects_static_table_next_level():
+    my_mock = dm_mock = mock.mock_open(read_data=get_dm_file_contents())
+    db_mock = mock.mock_open(read_data=get_db_file_contents())
+    my_mock.side_effect = [dm_mock.return_value, db_mock.return_value]
+
+    with mock.patch("builtins.open", my_mock):
+        my_db = agent_db.Database("database/test-dm.json", "mock_db.json")
+        found_objects_list1 = my_db.find_impl_objects("Device.Controller.{i}.", True)
+        found_objects_list2 = my_db.find_impl_objects("Device.Services.", True)
+
+    assert len(found_objects_list1) == 2
+    assert "Device.Controller.{i}.CoAP." in found_objects_list1
+    assert "Device.Controller.{i}.STOMP." in found_objects_list1
+    assert len(found_objects_list2) == 1
+    assert "Device.Services.HomeAutomation." in found_objects_list2
+#    assert "Device.Services.HomeAutomation.{i}." in found_objects_list2
+
+
+def test_find_impl_objects_instance_number_addressing():
+    my_mock = dm_mock = mock.mock_open(read_data=get_dm_file_contents())
+    db_mock = mock.mock_open(read_data=get_db_file_contents())
+    my_mock.side_effect = [dm_mock.return_value, db_mock.return_value]
+
+    with mock.patch("builtins.open", my_mock):
+        my_db = agent_db.Database("database/test-dm.json", "mock_db.json")
+        found_objects_list1 = my_db.find_impl_objects("Device.Controller.1.", False)
+        found_objects_list2 = my_db.find_impl_objects("Device.Services.HomeAutomation.1.", False)
+
+    assert len(found_objects_list1) == 2
+    assert "Device.Controller.{i}.CoAP." in found_objects_list1
+    assert "Device.Controller.{i}.STOMP." in found_objects_list1
+    assert len(found_objects_list2) == 2
+#    assert "Device.Services.HomeAutomation.{i}.Camera." in found_objects_list2
+    assert "Device.Services.HomeAutomation.{i}.Camera.{i}." in found_objects_list2
+#    assert "Device.Services.HomeAutomation.{i}.Camera..{i}.Pic." in found_objects_list2
+    assert "Device.Services.HomeAutomation.{i}.Camera.{i}.Pic.{i}." in found_objects_list2
+
+
+def test_find_impl_objects_instance_number_addressing_next_level():
+    my_mock = dm_mock = mock.mock_open(read_data=get_dm_file_contents())
+    db_mock = mock.mock_open(read_data=get_db_file_contents())
+    my_mock.side_effect = [dm_mock.return_value, db_mock.return_value]
+
+    with mock.patch("builtins.open", my_mock):
+        my_db = agent_db.Database("database/test-dm.json", "mock_db.json")
+        found_objects_list1 = my_db.find_impl_objects("Device.Controller.2.", True)
+        found_objects_list2 = my_db.find_impl_objects("Device.Services.HomeAutomation.1.", True)
+
+    assert len(found_objects_list1) == 2
+    assert "Device.Controller.{i}.CoAP." in found_objects_list1
+    assert "Device.Controller.{i}.STOMP." in found_objects_list1
+    assert len(found_objects_list2) == 1
+    assert "Device.Services.HomeAutomation.{i}.Camera." in found_objects_list2
+
+
+def test_find_impl_objects_instance_number_addressing_no_instance():
+    my_mock = dm_mock = mock.mock_open(read_data=get_dm_file_contents())
+    db_mock = mock.mock_open(read_data=get_db_file_contents())
+    my_mock.side_effect = [dm_mock.return_value, db_mock.return_value]
+
+    with mock.patch("builtins.open", my_mock):
+        my_db = agent_db.Database("database/test-dm.json", "mock_db.json")
+        found_objects_list1 = my_db.find_impl_objects("Device.Controller.5.", False)
+        found_objects_list2 = my_db.find_impl_objects("Device.Services.HomeAutomation.2.", False)
+
+    assert len(found_objects_list1) == 2
+    assert "Device.Controller.{i}.CoAP." in found_objects_list1
+    assert "Device.Controller.{i}.STOMP." in found_objects_list1
+    assert len(found_objects_list2) == 2
+#    assert "Device.Services.HomeAutomation.{i}.Camera." in found_objects_list2
+    assert "Device.Services.HomeAutomation.{i}.Camera.{i}." in found_objects_list2
+#    assert "Device.Services.HomeAutomation.{i}.Camera..{i}.Pic." in found_objects_list2
+    assert "Device.Services.HomeAutomation.{i}.Camera.{i}.Pic.{i}." in found_objects_list2
+
+
+def test_find_impl_objects_instance_number_addressing_no_instance_next_level():
+    my_mock = dm_mock = mock.mock_open(read_data=get_dm_file_contents())
+    db_mock = mock.mock_open(read_data=get_db_file_contents())
+    my_mock.side_effect = [dm_mock.return_value, db_mock.return_value]
+
+    with mock.patch("builtins.open", my_mock):
+        my_db = agent_db.Database("database/test-dm.json", "mock_db.json")
+        found_objects_list1 = my_db.find_impl_objects("Device.Controller.5.", True)
+        found_objects_list2 = my_db.find_impl_objects("Device.Services.HomeAutomation.2.", True)
+
+    assert len(found_objects_list1) == 2
+    assert "Device.Controller.{i}.CoAP." in found_objects_list1
+    assert "Device.Controller.{i}.STOMP." in found_objects_list1
+    assert len(found_objects_list2) == 1
+    assert "Device.Services.HomeAutomation.{i}.Camera." in found_objects_list2
+
+
+def test_find_impl_objects_wildcard_searching():
+    my_mock = dm_mock = mock.mock_open(read_data=get_dm_file_contents())
+    db_mock = mock.mock_open(read_data=get_db_file_contents())
+    my_mock.side_effect = [dm_mock.return_value, db_mock.return_value]
+
+    with mock.patch("builtins.open", my_mock):
+        my_db = agent_db.Database("database/test-dm.json", "mock_db.json")
+        found_objects_list1 = my_db.find_impl_objects("Device.Controller.*.", False)
+        found_objects_list2 = my_db.find_impl_objects("Device.Services.HomeAutomation.*.", False)
+
+    assert len(found_objects_list1) == 2
+    assert "Device.Controller.{i}.CoAP." in found_objects_list1
+    assert "Device.Controller.{i}.STOMP." in found_objects_list1
+    assert len(found_objects_list2) == 2
+    #    assert "Device.Services.HomeAutomation.{i}.Camera." in found_objects_list2
+    assert "Device.Services.HomeAutomation.{i}.Camera.{i}." in found_objects_list2
+    #    assert "Device.Services.HomeAutomation.{i}.Camera..{i}.Pic." in found_objects_list2
+    assert "Device.Services.HomeAutomation.{i}.Camera.{i}.Pic.{i}." in found_objects_list2
+
+
+def test_find_impl_objects_wildcard_searching_next_level():
+    my_mock = dm_mock = mock.mock_open(read_data=get_dm_file_contents())
+    db_mock = mock.mock_open(read_data=get_db_file_contents())
+    my_mock.side_effect = [dm_mock.return_value, db_mock.return_value]
+
+    with mock.patch("builtins.open", my_mock):
+        my_db = agent_db.Database("database/test-dm.json", "mock_db.json")
+        found_objects_list1 = my_db.find_impl_objects("Device.Controller.*.", True)
+        found_objects_list2 = my_db.find_impl_objects("Device.Services.HomeAutomation.*.", True)
+
+    assert len(found_objects_list1) == 2
+    assert "Device.Controller.{i}.CoAP." in found_objects_list1
+    assert "Device.Controller.{i}.STOMP." in found_objects_list1
+    assert len(found_objects_list2) == 1
+    assert "Device.Services.HomeAutomation.{i}.Camera." in found_objects_list2
+
+
 """
  Tests for get
    NOTE: Might need to mock: time.time(), datetime.datetime.now(), utils.IPAddr.get_ip_addr()
 """
+
 
 """
  Tests for update
    NOTE: Mocking the _save method
 """
 
+
 """
  Tests for insert
    NOTE: Mocking the _save method
 """
+
 
 """
  Tests for delete
