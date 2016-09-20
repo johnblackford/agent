@@ -214,12 +214,6 @@ class Database(object):
         if partial_path.endswith("."):
             # Turn the incoming path into a regex to validate it is in the implemented data model
             dm_regex_str = self._dm_regex(partial_path, True)
-#            dm_regex_str = "^" + partial_path
-#            dm_regex_str = re.sub(r'\.\d\.', '.{i}.', dm_regex_str)
-#            dm_regex_str = re.sub(r'\.', r'\.', dm_regex_str)
-#            dm_regex_str = re.sub(r'\{(.+?)\}', '{i}', dm_regex_str)
-#            dm_regex_str = re.sub(r'\*', '.+', dm_regex_str)
-#            dm_regex_str = dm_regex_str + ".*"
             logger.debug(
                 "find_impl_objects: Using regex \"%s\" to validate Path [%s] is in the Implemented Data Model",
                 dm_regex_str, partial_path)
@@ -241,10 +235,6 @@ class Database(object):
                     if key_parts_len > partial_path_part_len + 1:
                         built_path = self._build_path_from_parts(key_parts, partial_path_part_len)
                         found_key = built_path + key_parts[partial_path_part_len] + "."
-
-                    # Only add it to found_keys if we haven't done so already
-#                    if found_key not in found_keys:
-#                        found_keys.append(found_key)
                 else:
                     inx = 0
                     found_key = ""

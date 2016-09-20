@@ -554,9 +554,9 @@ def test_find_impl_objects_wildcard_searching():
     assert "Device.Controller.{i}.CoAP." in found_objects_list1
     assert "Device.Controller.{i}.STOMP." in found_objects_list1
     assert len(found_objects_list2) == 2
-    #    assert "Device.Services.HomeAutomation.{i}.Camera." in found_objects_list2
+#    assert "Device.Services.HomeAutomation.{i}.Camera." in found_objects_list2
     assert "Device.Services.HomeAutomation.{i}.Camera.{i}." in found_objects_list2
-    #    assert "Device.Services.HomeAutomation.{i}.Camera..{i}.Pic." in found_objects_list2
+#    assert "Device.Services.HomeAutomation.{i}.Camera..{i}.Pic." in found_objects_list2
     assert "Device.Services.HomeAutomation.{i}.Camera.{i}.Pic.{i}." in found_objects_list2
 
 
