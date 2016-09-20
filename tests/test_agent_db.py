@@ -183,7 +183,7 @@ def test_find_param_static_path():
     my_mock.side_effect = [dm_mock.return_value, db_mock.return_value]
 
     with mock.patch("builtins.open", my_mock):
-        my_db = agent_db.Database("database/test-dm.json", "mock_db.json")
+        my_db = agent_db.Database("mock_dm.json", "mock_db.json")
         found_param_list1 = my_db.find_params("Device.ControllerNumberOfEntries")
         found_param_list2 = my_db.find_params("Device.LocalAgent.SupportedProtocols")
 
@@ -199,7 +199,7 @@ def test_find_param_static_path_exception():
     my_mock.side_effect = [dm_mock.return_value, db_mock.return_value]
 
     with mock.patch("builtins.open", my_mock):
-        my_db = agent_db.Database("database/test-dm.json", "mock_db.json")
+        my_db = agent_db.Database("mock_dm.json", "mock_db.json")
         try:
             my_db.find_params("Device.NoSuchParameter")
             assert True, "NoSuchPathError Excepted"
@@ -213,7 +213,7 @@ def test_find_param_instance_number_addressing():
     my_mock.side_effect = [dm_mock.return_value, db_mock.return_value]
 
     with mock.patch("builtins.open", my_mock):
-        my_db = agent_db.Database("database/test-dm.json", "mock_db.json")
+        my_db = agent_db.Database("mock_dm.json", "mock_db.json")
         found_param_list1 = my_db.find_params("Device.Controller.1.Enable")
         found_param_list2 = my_db.find_params("Device.Controller.2.STOMP.Username")
         found_param_list3 = my_db.find_params("Device.Services.HomeAutomation.1.Camera.1.Pic.10.URL")
@@ -232,7 +232,7 @@ def test_find_param_instance_number_addressing_no_instance():
     my_mock.side_effect = [dm_mock.return_value, db_mock.return_value]
 
     with mock.patch("builtins.open", my_mock):
-        my_db = agent_db.Database("database/test-dm.json", "mock_db.json")
+        my_db = agent_db.Database("mock_dm.json", "mock_db.json")
         found_param_list1 = my_db.find_params("Device.Services.HomeAutomation.1.Camera.1.Pic.1.URL")
 
     assert len(found_param_list1) == 0
@@ -244,7 +244,7 @@ def test_find_param_wildcard_searching():
     my_mock.side_effect = [dm_mock.return_value, db_mock.return_value]
 
     with mock.patch("builtins.open", my_mock):
-        my_db = agent_db.Database("database/test-dm.json", "mock_db.json")
+        my_db = agent_db.Database("mock_dm.json", "mock_db.json")
         found_param_list1 = my_db.find_params("Device.Controller.*.Enable")
         found_param_list2 = my_db.find_params("Device.Controller.*.STOMP.Username")
         found_param_list3 = my_db.find_params("Device.Services.HomeAutomation.1.Camera.1.Pic.*.URL")
@@ -278,7 +278,7 @@ def test_find_instances_invalid_obj():
     my_mock.side_effect = [dm_mock.return_value, db_mock.return_value]
 
     with mock.patch("builtins.open", my_mock):
-        my_db = agent_db.Database("database/test-dm.json", "mock_db.json")
+        my_db = agent_db.Database("mock_dm.json", "mock_db.json")
         try:
             my_db.find_instances("Device.NoSuchObj.")
             assert True, "NoSuchPathError Excepted"
@@ -292,7 +292,7 @@ def test_find_instances_full_path():
     my_mock.side_effect = [dm_mock.return_value, db_mock.return_value]
 
     with mock.patch("builtins.open", my_mock):
-        my_db = agent_db.Database("database/test-dm.json", "mock_db.json")
+        my_db = agent_db.Database("mock_dm.json", "mock_db.json")
         try:
             my_db.find_instances("Device.ControllerNumberOfEntries")
             assert True, "NoSuchPathError Excepted"
@@ -306,7 +306,7 @@ def test_find_instances_static_table():
     my_mock.side_effect = [dm_mock.return_value, db_mock.return_value]
 
     with mock.patch("builtins.open", my_mock):
-        my_db = agent_db.Database("database/test-dm.json", "mock_db.json")
+        my_db = agent_db.Database("mock_dm.json", "mock_db.json")
         found_instances_list1 = my_db.find_instances("Device.Controller.")
         found_instances_list2 = my_db.find_instances("Device.Subscription.")
 
@@ -326,7 +326,7 @@ def test_find_instances_instance_number_addressing():
     my_mock.side_effect = [dm_mock.return_value, db_mock.return_value]
 
     with mock.patch("builtins.open", my_mock):
-        my_db = agent_db.Database("database/test-dm.json", "mock_db.json")
+        my_db = agent_db.Database("mock_dm.json", "mock_db.json")
         found_instances_list1 = my_db.find_instances("Device.Services.HomeAutomation.1.Camera.2.Pic.")
 
     assert len(found_instances_list1) == 3
@@ -341,7 +341,7 @@ def test_find_instances_instance_number_addressing_no_instance():
     my_mock.side_effect = [dm_mock.return_value, db_mock.return_value]
 
     with mock.patch("builtins.open", my_mock):
-        my_db = agent_db.Database("database/test-dm.json", "mock_db.json")
+        my_db = agent_db.Database("mock_dm.json", "mock_db.json")
         found_instances_list1 = my_db.find_instances("Device.Services.HomeAutomation.1.Camera.3.Pic.")
 
     assert len(found_instances_list1) == 0
@@ -353,7 +353,7 @@ def test_find_instances_wildcard_searching():
     my_mock.side_effect = [dm_mock.return_value, db_mock.return_value]
 
     with mock.patch("builtins.open", my_mock):
-        my_db = agent_db.Database("database/test-dm.json", "mock_db.json")
+        my_db = agent_db.Database("mock_dm.json", "mock_db.json")
         found_instances_list1 = my_db.find_instances("Device.Services.HomeAutomation.1.Camera.*.Pic.")
 
     assert len(found_instances_list1) == 5
@@ -375,7 +375,7 @@ def test_find_impl_objects_invalid_obj():
     my_mock.side_effect = [dm_mock.return_value, db_mock.return_value]
 
     with mock.patch("builtins.open", my_mock):
-        my_db = agent_db.Database("database/test-dm.json", "mock_db.json")
+        my_db = agent_db.Database("mock_dm.json", "mock_db.json")
         try:
             my_db.find_impl_objects("Device.NoSuchObj.", False)
             assert True, "NoSuchPathError Excepted"
@@ -389,7 +389,7 @@ def test_find_impl_objects_invalid_obj_next_level():
     my_mock.side_effect = [dm_mock.return_value, db_mock.return_value]
 
     with mock.patch("builtins.open", my_mock):
-        my_db = agent_db.Database("database/test-dm.json", "mock_db.json")
+        my_db = agent_db.Database("mock_dm.json", "mock_db.json")
         try:
             my_db.find_impl_objects("Device.NoSuchObj.", True)
             assert True, "NoSuchPathError Excepted"
@@ -403,7 +403,7 @@ def test_find_impl_objects_full_path():
     my_mock.side_effect = [dm_mock.return_value, db_mock.return_value]
 
     with mock.patch("builtins.open", my_mock):
-        my_db = agent_db.Database("database/test-dm.json", "mock_db.json")
+        my_db = agent_db.Database("mock_dm.json", "mock_db.json")
         try:
             my_db.find_impl_objects("Device.ControllerNumberOfEntries", False)
             assert True, "NoSuchPathError Excepted"
@@ -417,7 +417,7 @@ def test_find_impl_objects_full_path_next_level():
     my_mock.side_effect = [dm_mock.return_value, db_mock.return_value]
 
     with mock.patch("builtins.open", my_mock):
-        my_db = agent_db.Database("database/test-dm.json", "mock_db.json")
+        my_db = agent_db.Database("mock_dm.json", "mock_db.json")
         try:
             my_db.find_impl_objects("Device.ControllerNumberOfEntries", True)
             assert True, "NoSuchPathError Excepted"
@@ -431,7 +431,7 @@ def test_find_impl_objects_static_table():
     my_mock.side_effect = [dm_mock.return_value, db_mock.return_value]
 
     with mock.patch("builtins.open", my_mock):
-        my_db = agent_db.Database("database/test-dm.json", "mock_db.json")
+        my_db = agent_db.Database("mock_dm.json", "mock_db.json")
         found_objects_list1 = my_db.find_impl_objects("Device.Controller.{i}.", False)
         found_objects_list2 = my_db.find_impl_objects("Device.Subscription.", False)
         found_objects_list3 = my_db.find_impl_objects("Device.Services.", False)
@@ -456,7 +456,7 @@ def test_find_impl_objects_static_table_next_level():
     my_mock.side_effect = [dm_mock.return_value, db_mock.return_value]
 
     with mock.patch("builtins.open", my_mock):
-        my_db = agent_db.Database("database/test-dm.json", "mock_db.json")
+        my_db = agent_db.Database("mock_dm.json", "mock_db.json")
         found_objects_list1 = my_db.find_impl_objects("Device.Controller.{i}.", True)
         found_objects_list2 = my_db.find_impl_objects("Device.Services.", True)
 
@@ -474,7 +474,7 @@ def test_find_impl_objects_instance_number_addressing():
     my_mock.side_effect = [dm_mock.return_value, db_mock.return_value]
 
     with mock.patch("builtins.open", my_mock):
-        my_db = agent_db.Database("database/test-dm.json", "mock_db.json")
+        my_db = agent_db.Database("mock_dm.json", "mock_db.json")
         found_objects_list1 = my_db.find_impl_objects("Device.Controller.1.", False)
         found_objects_list2 = my_db.find_impl_objects("Device.Services.HomeAutomation.1.", False)
 
@@ -494,7 +494,7 @@ def test_find_impl_objects_instance_number_addressing_next_level():
     my_mock.side_effect = [dm_mock.return_value, db_mock.return_value]
 
     with mock.patch("builtins.open", my_mock):
-        my_db = agent_db.Database("database/test-dm.json", "mock_db.json")
+        my_db = agent_db.Database("mock_dm.json", "mock_db.json")
         found_objects_list1 = my_db.find_impl_objects("Device.Controller.2.", True)
         found_objects_list2 = my_db.find_impl_objects("Device.Services.HomeAutomation.1.", True)
 
@@ -511,7 +511,7 @@ def test_find_impl_objects_instance_number_addressing_no_instance():
     my_mock.side_effect = [dm_mock.return_value, db_mock.return_value]
 
     with mock.patch("builtins.open", my_mock):
-        my_db = agent_db.Database("database/test-dm.json", "mock_db.json")
+        my_db = agent_db.Database("mock_dm.json", "mock_db.json")
         found_objects_list1 = my_db.find_impl_objects("Device.Controller.5.", False)
         found_objects_list2 = my_db.find_impl_objects("Device.Services.HomeAutomation.2.", False)
 
@@ -531,7 +531,7 @@ def test_find_impl_objects_instance_number_addressing_no_instance_next_level():
     my_mock.side_effect = [dm_mock.return_value, db_mock.return_value]
 
     with mock.patch("builtins.open", my_mock):
-        my_db = agent_db.Database("database/test-dm.json", "mock_db.json")
+        my_db = agent_db.Database("mock_dm.json", "mock_db.json")
         found_objects_list1 = my_db.find_impl_objects("Device.Controller.5.", True)
         found_objects_list2 = my_db.find_impl_objects("Device.Services.HomeAutomation.2.", True)
 
@@ -548,7 +548,7 @@ def test_find_impl_objects_wildcard_searching():
     my_mock.side_effect = [dm_mock.return_value, db_mock.return_value]
 
     with mock.patch("builtins.open", my_mock):
-        my_db = agent_db.Database("database/test-dm.json", "mock_db.json")
+        my_db = agent_db.Database("mock_dm.json", "mock_db.json")
         found_objects_list1 = my_db.find_impl_objects("Device.Controller.*.", False)
         found_objects_list2 = my_db.find_impl_objects("Device.Services.HomeAutomation.*.", False)
 
@@ -568,7 +568,7 @@ def test_find_impl_objects_wildcard_searching_next_level():
     my_mock.side_effect = [dm_mock.return_value, db_mock.return_value]
 
     with mock.patch("builtins.open", my_mock):
-        my_db = agent_db.Database("database/test-dm.json", "mock_db.json")
+        my_db = agent_db.Database("mock_dm.json", "mock_db.json")
         found_objects_list1 = my_db.find_impl_objects("Device.Controller.*.", True)
         found_objects_list2 = my_db.find_impl_objects("Device.Services.HomeAutomation.*.", True)
 
@@ -598,7 +598,7 @@ def test_get_uptime():
 
     with mock.patch("builtins.open", file_mock):
         with mock.patch("time.time", time_mock):
-            my_db = agent_db.Database("database/test-dm.json", "mock_db.json")
+            my_db = agent_db.Database("mock_dm.json", "mock_db.json")
             get_value1 = my_db.get("Device.LocalAgent.UpTime")
 
     assert get_value1 == 18065
@@ -610,7 +610,7 @@ def test_get_num_entries():
     file_mock.side_effect = [dm_mock.return_value, db_mock.return_value]
 
     with mock.patch("builtins.open", file_mock):
-        my_db = agent_db.Database("database/test-dm.json", "mock_db.json")
+        my_db = agent_db.Database("mock_dm.json", "mock_db.json")
         get_value1 = my_db.get("Device.ControllerNumberOfEntries")
         get_value2 = my_db.get("Device.SubscriptionNumberOfEntries")
         get_value3 = my_db.get("Device.Services.HomeAutomation.1.CameraNumberOfEntries")
@@ -632,7 +632,7 @@ def test_get_ip_addr():
 
     with mock.patch("builtins.open", file_mock):
         with mock.patch("agent.utils.IPAddr.get_ip_addr", ip_mock):
-            my_db = agent_db.Database("database/test-dm.json", "mock_db.json")
+            my_db = agent_db.Database("mock_dm.json", "mock_db.json")
             get_value1 = my_db.get("Device.LocalAgent.X_ARRIS-COM_IPAddr")
 
     assert get_value1 == "10.99.12.8"
@@ -648,7 +648,7 @@ def test_get_currrent_local_time():
 
     with mock.patch("builtins.open", file_mock):
         with mock.patch("datetime.datetime", time_mock):
-            my_db = agent_db.Database("database/test-dm.json", "mock_db.json")
+            my_db = agent_db.Database("mock_dm.json", "mock_db.json")
             get_value1 = my_db.get("Device.Time.CurrentLocalTime")
 
     assert get_value1 == "2016-09-20T20:15:10-06:00"
@@ -660,7 +660,7 @@ def test_get_normal_param():
     file_mock.side_effect = [dm_mock.return_value, db_mock.return_value]
 
     with mock.patch("builtins.open", file_mock):
-        my_db = agent_db.Database("database/test-dm.json", "mock_db.json")
+        my_db = agent_db.Database("mock_dm.json", "mock_db.json")
         get_value1 = my_db.get("Device.LocalAgent.Manufacturer")
         get_value2 = my_db.get("Device.Controller.1.Protocol")
         get_value3 = my_db.get("Device.Subscription.3.ID")
@@ -678,9 +678,9 @@ def test_get_no_such_path():
     my_mock.side_effect = [dm_mock.return_value, db_mock.return_value]
 
     with mock.patch("builtins.open", my_mock):
-        my_db = agent_db.Database("database/test-dm.json", "mock_db.json")
+        my_db = agent_db.Database("mock_dm.json", "mock_db.json")
         try:
-            my_db.find_impl_objects("Device.NoSuchParam", False)
+            my_db.get("Device.NoSuchParam")
             assert True, "NoSuchPathError Excepted"
         except agent_db.NoSuchPathError:
             pass
@@ -690,6 +690,35 @@ def test_get_no_such_path():
  Tests for update
    NOTE: Mocking the _save method
 """
+
+
+def test_update_param():
+    file_mock = dm_mock = mock.mock_open(read_data=get_dm_file_contents())
+    db_mock = mock.mock_open(read_data=get_db_file_contents())
+    file_mock.side_effect = [dm_mock.return_value, db_mock.return_value]
+
+    with mock.patch("builtins.open", file_mock):
+        with mock.patch.object(agent_db.Database, '_save') as save_mock:
+            my_db = agent_db.Database("mock_dm.json", "mock_db.json")
+            my_db.update("Device.LocalAgent.PeriodicInterval", 60)
+
+    save_mock.assert_called_once_with()
+
+
+def test_update_no_such_path():
+    my_mock = dm_mock = mock.mock_open(read_data=get_dm_file_contents())
+    db_mock = mock.mock_open(read_data=get_db_file_contents())
+    my_mock.side_effect = [dm_mock.return_value, db_mock.return_value]
+
+    with mock.patch("builtins.open", my_mock):
+        my_db = agent_db.Database("mock_dm.json", "mock_db.json")
+        my_db._save = mock.MagicMock()
+
+        try:
+            my_db.update("Device.NoSuchParam", "ZZZ")
+            assert True, "NoSuchPathError Excepted"
+        except agent_db.NoSuchPathError:
+            pass
 
 
 """
