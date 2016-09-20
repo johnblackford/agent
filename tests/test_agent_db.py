@@ -25,6 +25,8 @@ SOFTWARE.
 #
 """
 
+import time
+import datetime
 import unittest.mock as mock
 
 from agent import agent_db
@@ -579,8 +581,109 @@ def test_find_impl_objects_wildcard_searching_next_level():
 
 """
  Tests for get
-   NOTE: Might need to mock: time.time(), datetime.datetime.now(), utils.IPAddr.get_ip_addr()
 """
+
+
+def test_get_uptime():
+    time_mock = start_time_mock = mock.Mock()
+    current_time_mock = mock.Mock()
+
+    start_time_mock.return_value = time.mktime(datetime.datetime(2016, 9, 20, 20, 15, 10).timetuple())
+    current_time_mock.return_value = time.mktime(datetime.datetime(2016, 9, 21, 1, 16, 15).timetuple())
+    time_mock.side_effect = [start_time_mock.return_value, current_time_mock.return_value]
+
+    file_mock = dm_mock = mock.mock_open(read_data=get_dm_file_contents())
+    db_mock = mock.mock_open(read_data=get_db_file_contents())
+    file_mock.side_effect = [dm_mock.return_value, db_mock.return_value]
+
+    with mock.patch("builtins.open", file_mock):
+        with mock.patch("time.time", time_mock):
+            my_db = agent_db.Database("database/test-dm.json", "mock_db.json")
+            get_value1 = my_db.get("Device.LocalAgent.UpTime")
+
+    assert get_value1 == 18065
+
+
+def test_get_num_entries():
+    file_mock = dm_mock = mock.mock_open(read_data=get_dm_file_contents())
+    db_mock = mock.mock_open(read_data=get_db_file_contents())
+    file_mock.side_effect = [dm_mock.return_value, db_mock.return_value]
+
+    with mock.patch("builtins.open", file_mock):
+        my_db = agent_db.Database("database/test-dm.json", "mock_db.json")
+        get_value1 = my_db.get("Device.ControllerNumberOfEntries")
+        get_value2 = my_db.get("Device.SubscriptionNumberOfEntries")
+        get_value3 = my_db.get("Device.Services.HomeAutomation.1.CameraNumberOfEntries")
+        get_value4 = my_db.get("Device.Services.HomeAutomation.1.Camera.2.PicNumberOfEntries")
+
+    assert get_value1 == 2
+    assert get_value2 == 4
+    assert get_value3 == 2
+    assert get_value4 == 3
+
+
+def test_get_ip_addr():
+    ip_mock = mock.Mock()
+    ip_mock.return_value = "10.99.12.8"
+
+    file_mock = dm_mock = mock.mock_open(read_data=get_dm_file_contents())
+    db_mock = mock.mock_open(read_data=get_db_file_contents())
+    file_mock.side_effect = [dm_mock.return_value, db_mock.return_value]
+
+    with mock.patch("builtins.open", file_mock):
+        with mock.patch("agent.utils.IPAddr.get_ip_addr", ip_mock):
+            my_db = agent_db.Database("database/test-dm.json", "mock_db.json")
+            get_value1 = my_db.get("Device.LocalAgent.X_ARRIS-COM_IPAddr")
+
+    assert get_value1 == "10.99.12.8"
+
+
+def test_get_currrent_local_time():
+    time_mock = mock.Mock()
+    time_mock.now.return_value = datetime.datetime(2016, 9, 20, 20, 15, 10)
+
+    file_mock = dm_mock = mock.mock_open(read_data=get_dm_file_contents())
+    db_mock = mock.mock_open(read_data=get_db_file_contents())
+    file_mock.side_effect = [dm_mock.return_value, db_mock.return_value]
+
+    with mock.patch("builtins.open", file_mock):
+        with mock.patch("datetime.datetime", time_mock):
+            my_db = agent_db.Database("database/test-dm.json", "mock_db.json")
+            get_value1 = my_db.get("Device.Time.CurrentLocalTime")
+
+    assert get_value1 == "2016-09-20T20:15:10-06:00"
+
+
+def test_get_normal_param():
+    file_mock = dm_mock = mock.mock_open(read_data=get_dm_file_contents())
+    db_mock = mock.mock_open(read_data=get_db_file_contents())
+    file_mock.side_effect = [dm_mock.return_value, db_mock.return_value]
+
+    with mock.patch("builtins.open", file_mock):
+        my_db = agent_db.Database("database/test-dm.json", "mock_db.json")
+        get_value1 = my_db.get("Device.LocalAgent.Manufacturer")
+        get_value2 = my_db.get("Device.Controller.1.Protocol")
+        get_value3 = my_db.get("Device.Subscription.3.ID")
+        get_value4 = my_db.get("Device.Services.HomeAutomation.1.Camera.2.MaxNumberOfPics")
+
+    assert get_value1 == "ARRIS"
+    assert get_value2 == "STOMP"
+    assert get_value3 == "sub-boot-coap"
+    assert get_value4 == 30
+
+
+def test_get_no_such_path():
+    my_mock = dm_mock = mock.mock_open(read_data=get_dm_file_contents())
+    db_mock = mock.mock_open(read_data=get_db_file_contents())
+    my_mock.side_effect = [dm_mock.return_value, db_mock.return_value]
+
+    with mock.patch("builtins.open", my_mock):
+        my_db = agent_db.Database("database/test-dm.json", "mock_db.json")
+        try:
+            my_db.find_impl_objects("Device.NoSuchParam", False)
+            assert True, "NoSuchPathError Excepted"
+        except agent_db.NoSuchPathError:
+            pass
 
 
 """
