@@ -207,6 +207,44 @@ def test_find_param_static_path_exception():
             pass
 
 
+def test_find_param_partial_path():
+    my_mock = dm_mock = mock.mock_open(read_data=get_dm_file_contents())
+    db_mock = mock.mock_open(read_data=get_db_file_contents())
+    my_mock.side_effect = [dm_mock.return_value, db_mock.return_value]
+
+    with mock.patch("builtins.open", my_mock):
+        my_db = agent_db.Database("mock_dm.json", "mock_db.json")
+        found_param_list1 = my_db.find_params("Device.LocalAgent.")
+        found_param_list2 = my_db.find_params("Device.Services.")
+
+    assert len(found_param_list1) == 13
+    assert "Device.LocalAgent.Manufacturer" in found_param_list1
+    assert "Device.LocalAgent.ManufacturerOUI" in found_param_list1
+    assert "Device.LocalAgent.ProductClass" in found_param_list1
+    assert "Device.LocalAgent.SerialNumber" in found_param_list1
+    assert "Device.LocalAgent.EndpointID" in found_param_list1
+    assert "Device.LocalAgent.ModelName" in found_param_list1
+    assert "Device.LocalAgent.HardwareVersion" in found_param_list1
+    assert "Device.LocalAgent.SoftwareVersion" in found_param_list1
+    assert "Device.LocalAgent.PeriodicInterval" in found_param_list1
+    assert "Device.LocalAgent.ProvisioningCode" in found_param_list1
+    assert "Device.LocalAgent.SupportedProtocols" in found_param_list1
+    assert "Device.LocalAgent.UpTime" in found_param_list1
+    assert "Device.LocalAgent.X_ARRIS-COM_IPAddr" in found_param_list1
+    assert len(found_param_list2) == 11
+    assert "Device.Services.HomeAutomationNumberOfEntries" in found_param_list2
+    assert "Device.Services.HomeAutomation.1.CameraNumberOfEntries" in found_param_list2
+    assert "Device.Services.HomeAutomation.1.Camera.1.MaxNumberOfPics" in found_param_list2
+    assert "Device.Services.HomeAutomation.1.Camera.1.PicNumberOfEntries" in found_param_list2
+    assert "Device.Services.HomeAutomation.1.Camera.1.Pic.9.URL" in found_param_list2
+    assert "Device.Services.HomeAutomation.1.Camera.1.Pic.10.URL" in found_param_list2
+    assert "Device.Services.HomeAutomation.1.Camera.2.MaxNumberOfPics" in found_param_list2
+    assert "Device.Services.HomeAutomation.1.Camera.2.PicNumberOfEntries" in found_param_list2
+    assert "Device.Services.HomeAutomation.1.Camera.2.Pic.10.URL" in found_param_list2
+    assert "Device.Services.HomeAutomation.1.Camera.2.Pic.90.URL" in found_param_list2
+    assert "Device.Services.HomeAutomation.1.Camera.2.Pic.100.URL" in found_param_list2
+
+
 def test_find_param_instance_number_addressing():
     my_mock = dm_mock = mock.mock_open(read_data=get_dm_file_contents())
     db_mock = mock.mock_open(read_data=get_db_file_contents())

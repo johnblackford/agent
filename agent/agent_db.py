@@ -145,10 +145,13 @@ class Database(object):
 
         # If the path is Valid then retrieve the matching paths
         if is_implemented_path:
-            db_keys = self._db.keys()
-            for key in db_keys:
-                if re.fullmatch(db_regex_str, key) is not None:
-                    found_keys.append(key)
+            for param_path in self._db:
+                if re.fullmatch(db_regex_str, param_path) is not None:
+                    path_parts = param_path.split(".")
+                    path_part_len = len(path_parts) - 1
+
+                    if not self._is_meta_parameter(path_parts, path_part_len):
+                        found_keys.append(param_path)
         else:
             raise NoSuchPathError(path)
 
@@ -195,7 +198,7 @@ class Database(object):
                     found_key = built_path + path_parts[partial_path_part_len] + "."
 
                     if not self._is_meta_parameter(path_parts, partial_path_part_len):
-                        # Only add it to found_keys if we haven't do so already
+                        # Only add it to found_keys if we haven't done so already
                         if found_key not in found_keys:
                             found_keys.append(found_key)
         else:
