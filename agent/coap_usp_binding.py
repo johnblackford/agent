@@ -184,34 +184,26 @@ class SendingCoapUspBinding(object):
             self._logger.error("Failure encountered while sending the COAP Message: %s", err_msg)
             self._logger.debug("Setting the Future's Result to the error message")
             req_future.set_result(None)
-# TODO: Remove this if it is not needed
-#        except Exception as my_exception:
-#            self._logger.error("Failure encountered while sending the COAP Message: %s", my_exception)
-#            self._logger.debug("Setting the Future's Result to the error message")
-#            req_future.set_result(str(my_exception))
         else:
             self._logger.debug("Setting the Future's Result to the response")
             req_future.set_result(resp.payload)
 
-    def _build_uri(self, host, port, resource, ssl=False):
+    def _build_uri(self, host, port=0, resource="usp", ssl=False):
         """Construct a proper COAP URI from the incoming information"""
-        add_port_to_uri = True
+        coap_port = port
 
         if ssl:
             scheme = "coaps"
-            if port == 5684:
+            if port == 0:
                 # 5684 is the default COAPS port
-                add_port_to_uri = False
+                coap_port = 5684
         else:
             scheme = "coap"
-            if port == 5683:
+            if port == 0:
                 # 5683 is the default COAP port
-                add_port_to_uri = False
+                coap_port = 5683
 
-        if add_port_to_uri:
-            uri = "{}://{}:{}/{}".format(scheme, host, port, resource)
-        else:
-            uri = "{}://{}/{}".format(scheme, host, resource)
+        uri = "{}://{}:{}/{}".format(scheme, host, coap_port, resource)
 
         return uri
 
