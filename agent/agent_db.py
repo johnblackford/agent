@@ -206,6 +206,48 @@ class Database(object):
 
         return found_keys
 
+    def find_objects(self, partial_path):
+        """Retrieve a set of instantiated object paths that match the incoming path"""
+        found_keys = []
+        is_implemented_path = False
+        logger = logging.getLogger(self.__class__.__name__)
+
+        if partial_path.endswith("."):
+            # Turn the incoming path into a regex to validate it is in the implemented data model
+            dm_regex_str = self._dm_regex(partial_path, True)
+            logger.debug("find_instances: Using regex \"%s\" to validate Path [%s] is in the Implemented Data Model",
+                         dm_regex_str, partial_path)
+
+            # Turn the incoming path into a regex to get the matching paths
+            db_regex_str = self._db_regex(partial_path, True)
+            logger.debug("find_instances: Using regex \"%s\" to retrieve values from the Database for Path [%s]",
+                         db_regex_str, partial_path)
+        else:
+            raise NoSuchPathError(partial_path)
+
+        # length minus 1 due to the ending "." causing 1 more split
+        partial_path_part_len = len(partial_path.split(".")) - 1
+
+        # Validate that path is in the Implemented Data Model
+        for dm_key in self._dm:
+            if re.fullmatch(dm_regex_str, dm_key) is not None:
+                is_implemented_path = True
+                break
+
+        # If the path is Valid then retrieve the matching paths
+        if is_implemented_path:
+            for path in self._db:
+                if re.fullmatch(db_regex_str, path) is not None:
+                    # We only want the path to the next level (instance identifiers)
+                    path_parts = path.split(".")
+                    found_key = self._build_path_from_parts(path_parts, partial_path_part_len)
+
+                    if found_key not in found_keys:
+                        found_keys.append(found_key)
+        else:
+            raise NoSuchPathError(partial_path)
+
+        return found_keys
 
     def find_impl_objects(self, partial_path, next_level):
         """Retrieve a set of implemented object paths that match the incoming path"""
