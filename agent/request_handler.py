@@ -33,6 +33,7 @@ SOFTWARE.
 """
 
 
+import re
 import logging
 
 from agent import utils
@@ -59,7 +60,6 @@ class UspRequestHandler(object):
 
     def handle_request(self, msg_payload):
         """Handle a Request/Response interaction"""
-        resp = None
         req = usp.Msg()
 
         # De-Serialize the payload
@@ -126,6 +126,10 @@ class UspRequestHandler(object):
             # Validate that the Request body matches the Header's msg_type
             if req.body.request.WhichOneof("request") == "get_impl_objects":
                 resp = self._process_get_impl_objects(req)
+        elif req.header.msg_type == usp.Header.SET:
+            # Validate that the Request body matches the Header's msg_type
+            if req.body.request.WhichOneof("request") == "set":
+                resp = self._process_set(req)
         elif req.header.msg_type == usp.Header.OPERATE:
             # Validate that the Request body matches the Header's msg_type
             if req.body.request.WhichOneof("request") == "operate":
@@ -227,6 +231,173 @@ class UspRequestHandler(object):
 
         return resp
 
+    def _process_set(self, req):
+        """Process an incoming Set and generate a SetResp"""
+        resp = usp.Msg()
+        update_obj_result_list = []
+        set_failure_param_err_list = []
+        usp_err_msg = utils.UspErrMsg(req.header.msg_id, req.header.from_id, self._id)
+
+        # Populate the Response's Header information
+        self._populate_resp_header(req, resp, usp.Header.SET_RESP)
+
+        # Retrieve the all_partial flag from the request
+        allow_partial_updates = req.body.request.set.allow_partial
+
+        # Loop through each UpdateObject
+        for obj_to_update in req.body.request.set.update_obj:
+            err_msg = ""
+            param_err_list = []
+            update_failure = False
+            update_inst_result_list = []
+            obj_path_to_update = obj_to_update.obj_path
+            auto_create_obj = obj_to_update.auto_create
+
+            try:
+                affected_path_list = self._get_affected_paths(obj_path_to_update, auto_create_obj)
+
+                # For each Affected Path, update the Parameter Settings
+                for affected_path in affected_path_list:
+                    path_to_set_dict = {}
+                    err_msg = "Failed to Set Required Parameters: "
+
+                    update_inst_result = usp.SetResp.UpdatedInstanceResult()
+                    update_inst_result.affected_path = affected_path
+
+                    # Loop through each parameter to validate it
+                    for param_to_update in obj_to_update.param_setting:
+                        param_path = affected_path + param_to_update.param
+                        value_to_set = param_to_update.value
+                        try:
+                            curr_value = self._db.get(param_path)
+                            if curr_value == value_to_set:
+                                self._logger.info("Ignoring %s: same value as current", param_path)
+                                update_inst_result.result_param_map[param_path] = value_to_set
+                            else:
+                                path_to_set_dict[param_path] = value_to_set
+                        except agent_db.NoSuchPathError:
+                            if param_to_update.required:
+                                update_failure = True
+                                err_msg = err_msg + param_path + " "
+                            else:
+                                param_err = usp.SetResp.ParameterError()
+                                param_err.param_path = param_path
+                                param_err.param_value = value_to_set
+                                param_err.err_code = 9000
+                                param_err.err_msg = "Parameter doesn't exist"
+                                param_err_list.append(param_err)
+
+                    # Loop through each validated parameter to set it
+                    # TODO: If only supposed to put param (not full path) in result_param_map,
+                    ### Need to only put that in the path_to_set_dict (and rename it param_to_set_dict,
+                    ###  and combine affected_path with param inside the for loop for the update call
+                    if not update_failure:
+                        for param_path in path_to_set_dict:
+                            value_to_set = path_to_set_dict[param_path]
+                            self._db.update(param_path, value_to_set)
+                            update_inst_result.result_param_map[param_path] = value_to_set
+
+                    update_inst_result_list.append(update_inst_result)
+
+                # If we found required parameters that weren't implemented
+                if update_failure:
+                    raise SetValidationError(9000, err_msg)
+                else:
+                    update_obj_result = usp.SetResp.UpdatedObjectResult()
+                    update_obj_result.requested_path = obj_path_to_update
+                    update_obj_result.oper_status.oper_success.param_err.extend(param_err_list)
+                    update_obj_result.oper_status.oper_success.updated_inst_result.extend(update_inst_result_list)
+                    update_obj_result_list.append(update_obj_result)
+            except SetValidationError as sv_err:
+                if allow_partial_updates:
+                    # Invalid Path Found, Allow Partial Updates = True :: Fail this one object path
+                    update_obj_result = usp.SetResp.UpdatedObjectResult()
+                    update_obj_result.requested_path = obj_path_to_update
+                    update_obj_result.oper_status.oper_failure.err_code = sv_err.get_error_code()
+                    update_obj_result.oper_status.oper_failure.err_msg = sv_err.get_error_message()
+                    update_obj_result_list.append(update_obj_result)
+                else:
+                    # Invalid Path Found, Allow Partial Updates = False :: Fail the entire Set
+                    set_failure_param_err = usp.Error.ParamError()
+                    set_failure_param_err.param_path = obj_path_to_update
+                    set_failure_param_err.err_code = sv_err.get_error_code()
+                    set_failure_param_err.err_msg = sv_err.get_error_message()
+                    set_failure_param_err_list.append(set_failure_param_err)
+                    # TODO: if we need to process all of the update_obj instances, then remove the break and
+                    ### add in a set_failure_validate_only flag
+                    break
+
+        if len(set_failure_param_err_list) > 0:
+            err_code = 9000
+            err_msg = "Invalid Path Found, Allow Partial Updates = False :: Fail the entire Set"
+            resp = usp_err_msg.generate_error(err_code, err_msg)
+            resp.body.error.param_err.extend(set_failure_param_err_list)
+        else:
+            resp.body.response.set_resp.updated_obj_result.extend(update_obj_result_list)
+
+        return resp
+
+    def _get_affected_paths(self, obj_path_to_update, auto_create_obj):
+        """
+          Retrieve the affected paths based on the incoming obj_path:
+            - Retrieve existing Paths (including general validation and that it is supported)
+              - If no Paths exist then consider the auto_create flag :: SetValidationError raised if anything fails
+        """
+        is_static_path = self._is_set_path_static(obj_path_to_update)
+        is_search_path = self._is_set_path_searching(obj_path_to_update)
+
+        try:
+            affected_path_list = self._db.find_objects(obj_path_to_update)
+
+            if len(affected_path_list) == 0:
+                if auto_create_obj:
+                    if is_search_path or is_static_path:
+                        pass
+                    else:
+                        # The obj_path doesn't exist, but auto_create is enabled so create the instance
+                        affected_path_list = self._auto_create_set_path(obj_path_to_update)
+                else:
+                    err_code = 9000
+                    err_msg = "Non-existent obj_path encountered (auto_create disabled)- {}".format(obj_path_to_update)
+                    raise SetValidationError(err_code, err_msg)
+        except agent_db.NoSuchPathError:
+            err_code = 9000
+            err_msg = "Invalid obj_path encountered - {}".format(obj_path_to_update)
+            raise SetValidationError(err_code, err_msg)
+
+        return affected_path_list
+
+    def _is_set_path_static(self, obj_path_to_update):
+        """
+          Check to see tha the obj_path_to_update doesn't contain:
+            - Instance Number based addressing elements
+            - FUTURE: Unique Key based addressing elements
+            - wildcard-based searching elements
+            - FUTURE: expression-based searching elements
+        """
+        if not self._is_set_path_searching(obj_path_to_update):
+            pattern = re.compile(r'\.[0-9]+\.')
+            if pattern.search(obj_path_to_update) is None:
+                return True
+
+        return False
+
+    def _is_set_path_searching(self, obj_path_to_update):
+        """
+          Check to see if the obj_path_to_update contains:
+            - wildcard-based searching elements
+            - FUTURE: expression-based searching elements
+        """
+        return ".*." in obj_path_to_update
+
+    def _auto_create_set_path(self, obj_path_to_update):
+        """
+          Automatically Create the obj_path_to_update with the supplied inst_ident:
+            - Unless the inst_ident is an instance number, then create with next instance number
+            - Return the path that was created in a list
+        """
+        raise SetValidationError(9000, "Auto Creation for Set not currently supported")
+
     def _process_operation(self, req):
         """Process an incoming Operate and generate a OperateResp"""
         resp = usp.Msg()
@@ -284,3 +455,20 @@ class ProtocolViolationError(Exception):
 class ProtocolValidationError(Exception):
     """A USP Protocol Violation Error"""
     pass
+
+
+class SetValidationError(Exception):
+    """A USP Validation Exception for the Set USP Message"""
+    def __init__(self, err_code, err_msg):
+        """Initialize the Set Validation Error"""
+        self._err_msg = err_msg
+        self._err_code = err_code
+        Exception.__init__(self, "[{}] - {}".format(err_code, err_msg))
+
+    def get_error_code(self):
+        """Retrieve the Error Code"""
+        return self._err_code
+
+    def get_error_message(self):
+        """Retrieve the Error Message"""
+        return self._err_msg
