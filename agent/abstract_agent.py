@@ -234,7 +234,7 @@ class AbstractAgent(object):
     def _handle_periodic(self, subscription_path, controller_id, controller_path, subscription_id):
         """Handle a Subscription for a Periodic Notification"""
         param_path = self._db.get(subscription_path + "ParamPath")
-        periodic_interval = self._db.get(param_path + "PeriodicInterval")
+        periodic_interval = int(self._db.get(param_path + "PeriodicInterval"))
         periodic_handler = self._get_periodic_notif_handler(self._endpoint_id, controller_id,
                                                             controller_path, subscription_id,
                                                             param_path, periodic_interval)
