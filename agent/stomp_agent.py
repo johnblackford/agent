@@ -197,8 +197,13 @@ class StompBindingListener(threading.Thread):
 
             self._logger.info("Handled a [%s] Request",
                               req.body.request.WhichOneof("request"))
-            self._logger.info("Sending a [%s] Response",
-                              resp.body.response.WhichOneof("response"))
+            if resp.body.HasField("response"):
+                self._logger.info("Sending a [%s] Response",
+                                  resp.body.response.WhichOneof("response"))
+            elif resp.body.HasField("error"):
+                self._logger.info("Responding with an Error")
+            else:
+                self._logger.warning("Sending an Unknown Response")
 
             # Send the message either to the "from" or "reply-to" contained in the request
             #  "reply-to" is optional and overrides the "from"

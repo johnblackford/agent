@@ -86,8 +86,13 @@ class CoapAgent(abstract_agent.AbstractAgent):
             # Now that we have a response, send it out
             self._logger.info("Handled a [%s] Request",
                               req.body.request.WhichOneof("request"))
-            self._logger.info("Sending a [%s] Response",
-                              resp.body.response.WhichOneof("response"))
+            if resp.body.HasField("response"):
+                self._logger.info("Sending a [%s] Response",
+                                  resp.body.response.WhichOneof("response"))
+            elif resp.body.HasField("error"):
+                self._logger.info("Responding with an Error")
+            else:
+                self._logger.warning("Sending an Unknown Response")
             self._binding.send_response(coap_msg)
         except request_handler.ProtocolViolationError:
             coap_msg = coap_usp_binding.CoapMessage(coap_usp_binding.CoapMessage.RESP_CODE_REQ_INCOMPLETE)
