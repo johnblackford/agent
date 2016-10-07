@@ -111,7 +111,7 @@ class UspRequestHandler(object):
         """Processing the incoming Message and return a Response"""
         to_id = req.header.from_id
         err_msg = "Message Failure: Request body does not match Header msg_type"
-        usp_err_msg = utils.UspErrMsg(utils.MessageIdHelper.get_message_id(), to_id, self._id)
+        usp_err_msg = utils.UspErrMsg(req.header.msg_id, to_id, self._id)
         resp = usp_err_msg.generate_error(9000, err_msg)
 
         if req.header.msg_type == usp.Header.GET:
@@ -425,13 +425,13 @@ class UspRequestHandler(object):
                 # Invalid Command - return an Error
                 to_id = req.header.from_id
                 err_msg = "Operate Failure: invalid command - {}".format(command)
-                usp_err_msg = utils.UspErrMsg(utils.MessageIdHelper.get_message_id(), to_id, self._id)
+                usp_err_msg = utils.UspErrMsg(req.header.msg_id, to_id, self._id)
                 resp = usp_err_msg.generate_error(9000, err_msg)
         else:
-            # Invalid Command - return an Error
+            # Unknown agent product class - return an Error
             to_id = req.header.from_id
             err_msg = "Operate Failure: unknown product class - {}".format(product_class)
-            usp_err_msg = utils.UspErrMsg(utils.MessageIdHelper.get_message_id(), to_id, self._id)
+            usp_err_msg = utils.UspErrMsg(req.header.msg_id, to_id, self._id)
             resp = usp_err_msg.generate_error(9000, err_msg)
 
         return resp
