@@ -272,9 +272,9 @@ class UspRequestHandler(object):
                             curr_value = self._db.get(param_path)
                             if curr_value == value_to_set:
                                 self._logger.info("Ignoring %s: same value as current", param_path)
-                                update_inst_result.result_param_map[param_path] = value_to_set
+                                update_inst_result.result_param_map[param_to_update.param] = value_to_set
                             else:
-                                path_to_set_dict[param_path] = value_to_set
+                                path_to_set_dict[param_to_update.param] = value_to_set
                         except agent_db.NoSuchPathError:
                             if param_to_update.required:
                                 update_failure = True
@@ -288,14 +288,12 @@ class UspRequestHandler(object):
                                 param_err_list.append(param_err)
 
                     # Loop through each validated parameter to set it
-                    # TODO: If only supposed to put param (not full path) in result_param_map,
-                    ### Need to only put that in the path_to_set_dict (and rename it param_to_set_dict,
-                    ###  and combine affected_path with param inside the for loop for the update call
                     if not update_failure:
-                        for param_path in path_to_set_dict:
-                            value_to_set = path_to_set_dict[param_path]
-                            self._db.update(param_path, value_to_set)
-                            update_inst_result.result_param_map[param_path] = value_to_set
+                        for param_name in path_to_set_dict:
+                            param_to_set = affected_path + param_name
+                            value_to_set = path_to_set_dict[param_name]
+                            self._db.update(param_to_set, value_to_set)
+                            update_inst_result.result_param_map[param_name] = value_to_set
 
                     update_inst_result_list.append(update_inst_result)
 
