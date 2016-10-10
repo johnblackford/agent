@@ -140,6 +140,20 @@ class AbstractAgent(object):
         raise NotImplementedError()
 
 
+    @staticmethod
+    def log_messages(logger, req, resp):
+        """Logging Helper Static Method"""
+        logger.info("Handled a [%s] Request",
+                    req.body.request.WhichOneof("request"))
+        if resp.body.HasField("response"):
+            logger.info("Sending a [%s] Response",
+                        resp.body.response.WhichOneof("response"))
+        elif resp.body.HasField("error"):
+            logger.info("Responding with an Error")
+        else:
+            logger.warning("Sending an Unknown Response")
+
+
     def _load_services(self):
         """Load Home Automation Services Helpers"""
         product_class = self._db.get("Device.LocalAgent.ProductClass")
