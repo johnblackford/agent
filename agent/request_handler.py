@@ -235,11 +235,30 @@ class UspRequestHandler(object):
         path_to_set_dict = {}
         update_obj_result_list = []
         set_failure_param_err_list = []
-        usp_err_msg = utils.UspErrMsg(req.header.msg_id, req.header.from_id, self._id)
 
         # Populate the Response's Header information
         self._populate_resp_header(req, resp, usp.Header.SET_RESP)
 
+        # Validate the Set Request and populate the dictionaries and lists appropriately
+        self._validate_set(req, path_to_set_dict, update_obj_result_list, set_failure_param_err_list)
+
+        # Finished with all validation, process the errors or make the updates
+        if len(set_failure_param_err_list) > 0:
+            usp_err_msg = utils.UspErrMsg(req.header.msg_id, req.header.from_id, self._id)
+            err_msg = "Invalid Path Found, Allow Partial Updates = False :: Fail the entire Set"
+            resp = usp_err_msg.generate_error(9000, err_msg)
+            resp.body.error.param_err.extend(set_failure_param_err_list)
+        else:
+            # Process the Updates against the database
+            for param_path in path_to_set_dict:
+                self._db.update(param_path, path_to_set_dict[param_path])
+
+            resp.body.response.set_resp.updated_obj_result.extend(update_obj_result_list)
+
+        return resp
+
+    def _validate_set(self, req, path_to_set_dict, update_obj_result_list, set_failure_param_err_list):
+        """Validate the Set Request"""
         # Retrieve the all_partial flag from the request
         allow_partial_updates = req.body.request.set.allow_partial
 
@@ -249,10 +268,9 @@ class UspRequestHandler(object):
             update_inst_result_list = []
             obj_path_set_failure_err_dict = {}
             obj_path_to_update = obj_to_update.obj_path
-            auto_create_obj = obj_to_update.auto_create
 
             try:
-                affected_path_list = self._get_affected_paths(obj_path_to_update, auto_create_obj)
+                affected_path_list = self._get_affected_paths(obj_path_to_update, obj_to_update.auto_create)
 
                 # For each Affected Path, update the Parameter Settings
                 for affected_path in affected_path_list:
@@ -266,67 +284,20 @@ class UspRequestHandler(object):
 
                     update_inst_result_list.append(update_inst_result)
 
-                # If there were no Set Failure errors for the obj_to_update, oper_success
                 if len(obj_path_set_failure_err_dict) == 0:
+                    # If there were no Set Failure errors for the obj_to_update, oper_success
                     update_obj_result = usp.SetResp.UpdatedObjectResult()
                     update_obj_result.requested_path = obj_path_to_update
                     update_obj_result.oper_status.oper_success.param_err.extend(param_err_list)
                     update_obj_result.oper_status.oper_success.updated_inst_result.extend(update_inst_result_list)
                     update_obj_result_list.append(update_obj_result)
                 else:
-                    # If there were Set Failure errors for the obj_to_update
-                    if allow_partial_updates:
-                        # Set Failures are handled via oper_failure on the SetResp
-                        err_msg = "Failed to Set Required Parameters: "
-
-                        for affected_path in obj_path_set_failure_err_dict:
-                            for param_name in obj_path_set_failure_err_dict[affected_path]:
-                                err_msg = err_msg + affected_path + param_name + " "
-
-                        update_obj_result = usp.SetResp.UpdatedObjectResult()
-                        update_obj_result.requested_path = obj_path_to_update
-                        update_obj_result.oper_status.oper_failure.err_code = 9000
-                        update_obj_result.oper_status.oper_failure.err_msg = err_msg
-                        update_obj_result_list.append(update_obj_result)
-                    else:
-                        # Set Failures are handled via ParamError on an Error message
-                        for affected_path in obj_path_set_failure_err_dict:
-                            for param_name in obj_path_set_failure_err_dict[affected_path]:
-                                set_failure_param_err = usp.Error.ParamError()
-                                set_failure_param_err.param_path = affected_path + param_name
-                                set_failure_param_err.err_code = 9000
-                                set_failure_param_err.err_msg = "Failed to Set Required Parameter"
-                                set_failure_param_err_list.append(set_failure_param_err)
+                    self._handle_set_param_errors(obj_path_to_update, allow_partial_updates,
+                                                  obj_path_set_failure_err_dict, update_obj_result_list,
+                                                  set_failure_param_err_list)
             except SetValidationError as sv_err:
-                if allow_partial_updates:
-                    # Invalid Path Found, Allow Partial Updates = True :: Fail this one object path
-                    update_obj_result = usp.SetResp.UpdatedObjectResult()
-                    update_obj_result.requested_path = obj_path_to_update
-                    update_obj_result.oper_status.oper_failure.err_code = sv_err.get_error_code()
-                    update_obj_result.oper_status.oper_failure.err_msg = sv_err.get_error_message()
-                    update_obj_result_list.append(update_obj_result)
-                else:
-                    # Invalid Path Found, Allow Partial Updates = False :: Fail the entire Set
-                    set_failure_param_err = usp.Error.ParamError()
-                    set_failure_param_err.param_path = obj_path_to_update
-                    set_failure_param_err.err_code = sv_err.get_error_code()
-                    set_failure_param_err.err_msg = sv_err.get_error_message()
-                    set_failure_param_err_list.append(set_failure_param_err)
-
-        if len(set_failure_param_err_list) > 0:
-            err_code = 9000
-            err_msg = "Invalid Path Found, Allow Partial Updates = False :: Fail the entire Set"
-            resp = usp_err_msg.generate_error(err_code, err_msg)
-            resp.body.error.param_err.extend(set_failure_param_err_list)
-        else:
-            # Process the Updates against the database
-            for param_path in path_to_set_dict:
-                value_to_set = path_to_set_dict[param_path]
-                self._db.update(param_path, value_to_set)
-
-            resp.body.response.set_resp.updated_obj_result.extend(update_obj_result_list)
-
-        return resp
+                self._handle_set_validation_err(obj_path_to_update, allow_partial_updates,
+                                                sv_err, update_obj_result_list, set_failure_param_err_list)
 
     def _get_affected_paths(self, obj_path_to_update, auto_create_obj):
         """
@@ -418,6 +389,51 @@ class UspRequestHandler(object):
                     param_err_list.append(param_err)
 
         return set_failure_err_list
+
+    def _handle_set_param_errors(self, obj_path_to_update, allow_partial_updates, obj_path_set_failure_err_dict,
+                                 update_obj_result_list, set_failure_param_err_list):
+        """Handle any errors generated from validating the individual parameters"""
+        # If there were Set Failure errors for the obj_to_update
+        if allow_partial_updates:
+            # Set Failures are handled via oper_failure on the SetResp
+            err_msg = "Failed to Set Required Parameters: "
+
+            for affected_path in obj_path_set_failure_err_dict:
+                for param_name in obj_path_set_failure_err_dict[affected_path]:
+                    err_msg = err_msg + affected_path + param_name + " "
+
+            update_obj_result = usp.SetResp.UpdatedObjectResult()
+            update_obj_result.requested_path = obj_path_to_update
+            update_obj_result.oper_status.oper_failure.err_code = 9000
+            update_obj_result.oper_status.oper_failure.err_msg = err_msg
+            update_obj_result_list.append(update_obj_result)
+        else:
+            # Set Failures are handled via ParamError on an Error message
+            for affected_path in obj_path_set_failure_err_dict:
+                for param_name in obj_path_set_failure_err_dict[affected_path]:
+                    set_failure_param_err = usp.Error.ParamError()
+                    set_failure_param_err.param_path = affected_path + param_name
+                    set_failure_param_err.err_code = 9000
+                    set_failure_param_err.err_msg = "Failed to Set Required Parameter"
+                    set_failure_param_err_list.append(set_failure_param_err)
+
+    def _handle_set_validation_err(self, obj_path_to_update, allow_partial_updates, sv_err,
+                                   update_obj_result_list, set_failure_param_err_list):
+        """Handle any errors generated from validating the object path"""
+        if allow_partial_updates:
+            # Invalid Path Found, Allow Partial Updates = True :: Fail this one object path
+            update_obj_result = usp.SetResp.UpdatedObjectResult()
+            update_obj_result.requested_path = obj_path_to_update
+            update_obj_result.oper_status.oper_failure.err_code = sv_err.get_error_code()
+            update_obj_result.oper_status.oper_failure.err_msg = sv_err.get_error_message()
+            update_obj_result_list.append(update_obj_result)
+        else:
+            # Invalid Path Found, Allow Partial Updates = False :: Fail the entire Set
+            set_failure_param_err = usp.Error.ParamError()
+            set_failure_param_err.param_path = obj_path_to_update
+            set_failure_param_err.err_code = sv_err.get_error_code()
+            set_failure_param_err.err_msg = sv_err.get_error_message()
+            set_failure_param_err_list.append(set_failure_param_err)
 
     def _process_operation(self, req):
         """Process an incoming Operate and generate a OperateResp"""
