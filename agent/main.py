@@ -80,7 +80,7 @@ class Agent(object):
             logging.info("## Starting a STOMP USP Agent                        ##")
             logging.info("#######################################################")
 
-            my_stomp_agent = stomp_agent.StompAgent(dm_file_name, db_file_name, cfg_file_name, debug)
+            my_stomp_agent = stomp_agent.StompAgent(dm_file_name, db_file_name, cfg_file_name)
             my_stomp_agent.start_listening()
             my_stomp_agent.clean_up()
 

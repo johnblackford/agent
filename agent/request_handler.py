@@ -47,12 +47,11 @@ TAKE_PICTURE_CAMERA_OP = "Device.Services.HomeAutomation.1.Camera.1.TakePicture(
 
 class UspRequestHandler(object):
     """A USP Message Handler: to be used by a USP Agent"""
-    def __init__(self, endpoint_id, agent_database, service_map=None, debug=False):
+    def __init__(self, endpoint_id, agent_database, service_map=None):
         """Initialize the USP Request Handler"""
         self._id = endpoint_id
         self._db = agent_database
         self._service_map = service_map
-        self._print_debug_messages = debug
 
         # Initialize the class logger
         self._logger = logging.getLogger(self.__class__.__name__)
@@ -76,7 +75,6 @@ class UspRequestHandler(object):
         except ProtocolValidationError as err:
             err_msg = "USP Message validation failed: {}".format(err)
             self._logger.error("%s", err_msg)
-            print(err_msg)
             raise ProtocolViolationError(err_msg)
 
         return req, resp, resp.SerializeToString()
@@ -268,8 +266,6 @@ class UspRequestHandler(object):
 
                     update_inst_result_list.append(update_inst_result)
 
-                print("Processed all affected paths for {}".format(obj_path_to_update))
-                print("Found {} items in the obj_path_set_failure_dict: {}".format(len(obj_path_set_failure_err_dict), obj_path_set_failure_err_dict))
                 # If there were no Set Failure errors for the obj_to_update, oper_success
                 if len(obj_path_set_failure_err_dict) == 0:
                     update_obj_result = usp.SetResp.UpdatedObjectResult()
@@ -277,7 +273,6 @@ class UspRequestHandler(object):
                     update_obj_result.oper_status.oper_success.param_err.extend(param_err_list)
                     update_obj_result.oper_status.oper_success.updated_inst_result.extend(update_inst_result_list)
                     update_obj_result_list.append(update_obj_result)
-                    print("Updated the update_obj_result_list for {}".format(obj_path_to_update))
                 else:
                     # If there were Set Failure errors for the obj_to_update
                     if allow_partial_updates:

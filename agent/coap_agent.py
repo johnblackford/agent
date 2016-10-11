@@ -57,7 +57,7 @@ class CoapAgent(abstract_agent.AbstractAgent):
     """A USP Agent that uses the CoAP Binding"""
     def __init__(self, dm_file, db_file, port=5683, cfg_file_name="cfg/agent.json", debug=False):
         """Initialize the CoAP Agent"""
-        abstract_agent.AbstractAgent.__init__(self, dm_file, db_file, cfg_file_name, debug)
+        abstract_agent.AbstractAgent.__init__(self, dm_file, db_file, cfg_file_name)
         self._binding = coap_usp_binding.ListeningCoapUspBinding(port, debug)
 
         self.set_value_change_notif_poller(CoapValueChangeNotifPoller(self._db))

@@ -59,9 +59,9 @@ from agent import stomp_usp_binding
 
 class StompAgent(abstract_agent.AbstractAgent):
     """A USP Agent that uses the STOMP Binding"""
-    def __init__(self, dm_file, db_file, cfg_file_name="cfg/agent.json", debug=False):
+    def __init__(self, dm_file, db_file, cfg_file_name="cfg/agent.json"):
         """Initialize the STOMP Agent"""
-        abstract_agent.AbstractAgent.__init__(self, dm_file, db_file, cfg_file_name, debug)
+        abstract_agent.AbstractAgent.__init__(self, dm_file, db_file, cfg_file_name)
 
         self._timeout = 15
         self._binding_dict = {}

@@ -74,7 +74,7 @@ CAMERA_IMAGE_DIR = "camera.image.dir"
 
 class AbstractAgent(object):
     """An Abstract USP Agent that can be built upon for a specific binding"""
-    def __init__(self, dm_file, db_file, cfg_file_name, debug=False):
+    def __init__(self, dm_file, db_file, cfg_file_name):
         """Initialize the Abstract Agent"""
         self._service_map = {}
         self._periodic_handler_list = []
@@ -88,7 +88,7 @@ class AbstractAgent(object):
 
         self._load_services()
         self._msg_handler = request_handler.UspRequestHandler(self._endpoint_id, self._db,
-                                                              self._service_map, debug)
+                                                              self._service_map)
 
 
     def get_msg_handler(self):
