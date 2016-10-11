@@ -234,6 +234,7 @@ class UspRequestHandler(object):
     def _process_set(self, req):
         """Process an incoming Set and generate a SetResp"""
         resp = usp.Msg()
+        path_to_set_dict = {}
         update_obj_result_list = []
         set_failure_param_err_list = []
         usp_err_msg = utils.UspErrMsg(req.header.msg_id, req.header.from_id, self._id)
@@ -246,10 +247,9 @@ class UspRequestHandler(object):
 
         # Loop through each UpdateObject
         for obj_to_update in req.body.request.set.update_obj:
-            err_msg = ""
             param_err_list = []
-            update_failure = False
             update_inst_result_list = []
+            obj_path_set_failure_err_dict = {}
             obj_path_to_update = obj_to_update.obj_path
             auto_create_obj = obj_to_update.auto_create
 
@@ -258,54 +258,50 @@ class UspRequestHandler(object):
 
                 # For each Affected Path, update the Parameter Settings
                 for affected_path in affected_path_list:
-                    path_to_set_dict = {}
-                    err_msg = "Failed to Set Required Parameters: "
-
                     update_inst_result = usp.SetResp.UpdatedInstanceResult()
                     update_inst_result.affected_path = affected_path
 
-                    # Loop through each parameter to validate it
-                    for param_to_update in obj_to_update.param_setting:
-                        param_path = affected_path + param_to_update.param
-                        value_to_set = param_to_update.value
-                        try:
-                            curr_value = self._db.get(param_path)
-                            if curr_value == value_to_set:
-                                self._logger.info("Ignoring %s: same value as current", param_path)
-                                update_inst_result.result_param_map[param_to_update.param] = value_to_set
-                            else:
-                                path_to_set_dict[param_to_update.param] = value_to_set
-                        except agent_db.NoSuchPathError:
-                            if param_to_update.required:
-                                update_failure = True
-                                err_msg = err_msg + param_path + " "
-                            else:
-                                param_err = usp.SetResp.ParameterError()
-                                param_err.param_path = param_path
-                                param_err.param_value = value_to_set
-                                param_err.err_code = 9000
-                                param_err.err_msg = "Parameter doesn't exist"
-                                param_err_list.append(param_err)
-
-                    # Loop through each validated parameter to set it
-                    if not update_failure:
-                        for param_name in path_to_set_dict:
-                            param_to_set = affected_path + param_name
-                            value_to_set = path_to_set_dict[param_name]
-                            self._db.update(param_to_set, value_to_set)
-                            update_inst_result.result_param_map[param_name] = value_to_set
+                    set_failure_err_list = self._validate_params(affected_path, obj_to_update, path_to_set_dict,
+                                                                 update_inst_result, param_err_list)
+                    if len(set_failure_err_list) > 0:
+                        obj_path_set_failure_err_dict[affected_path] = set_failure_err_list
 
                     update_inst_result_list.append(update_inst_result)
 
-                # If we found required parameters that weren't implemented
-                if update_failure:
-                    raise SetValidationError(9000, err_msg)
-                else:
+                print("Processed all affected paths for {}".format(obj_path_to_update))
+                print("Found {} items in the obj_path_set_failure_dict: {}".format(len(obj_path_set_failure_err_dict), obj_path_set_failure_err_dict))
+                # If there were no Set Failure errors for the obj_to_update, oper_success
+                if len(obj_path_set_failure_err_dict) == 0:
                     update_obj_result = usp.SetResp.UpdatedObjectResult()
                     update_obj_result.requested_path = obj_path_to_update
                     update_obj_result.oper_status.oper_success.param_err.extend(param_err_list)
                     update_obj_result.oper_status.oper_success.updated_inst_result.extend(update_inst_result_list)
                     update_obj_result_list.append(update_obj_result)
+                    print("Updated the update_obj_result_list for {}".format(obj_path_to_update))
+                else:
+                    # If there were Set Failure errors for the obj_to_update
+                    if allow_partial_updates:
+                        # Set Failures are handled via oper_failure on the SetResp
+                        err_msg = "Failed to Set Required Parameters: "
+
+                        for affected_path in obj_path_set_failure_err_dict:
+                            for param_name in obj_path_set_failure_err_dict[affected_path]:
+                                err_msg = err_msg + affected_path + param_name + " "
+
+                        update_obj_result = usp.SetResp.UpdatedObjectResult()
+                        update_obj_result.requested_path = obj_path_to_update
+                        update_obj_result.oper_status.oper_failure.err_code = 9000
+                        update_obj_result.oper_status.oper_failure.err_msg = err_msg
+                        update_obj_result_list.append(update_obj_result)
+                    else:
+                        # Set Failures are handled via ParamError on an Error message
+                        for affected_path in obj_path_set_failure_err_dict:
+                            for param_name in obj_path_set_failure_err_dict[affected_path]:
+                                set_failure_param_err = usp.Error.ParamError()
+                                set_failure_param_err.param_path = affected_path + param_name
+                                set_failure_param_err.err_code = 9000
+                                set_failure_param_err.err_msg = "Failed to Set Required Parameter"
+                                set_failure_param_err_list.append(set_failure_param_err)
             except SetValidationError as sv_err:
                 if allow_partial_updates:
                     # Invalid Path Found, Allow Partial Updates = True :: Fail this one object path
@@ -321,9 +317,6 @@ class UspRequestHandler(object):
                     set_failure_param_err.err_code = sv_err.get_error_code()
                     set_failure_param_err.err_msg = sv_err.get_error_message()
                     set_failure_param_err_list.append(set_failure_param_err)
-                    # TODO: if we need to process all of the update_obj instances, then remove the break and
-                    ### add in a set_failure_validate_only flag
-                    break
 
         if len(set_failure_param_err_list) > 0:
             err_code = 9000
@@ -331,6 +324,11 @@ class UspRequestHandler(object):
             resp = usp_err_msg.generate_error(err_code, err_msg)
             resp.body.error.param_err.extend(set_failure_param_err_list)
         else:
+            # Process the Updates against the database
+            for param_path in path_to_set_dict:
+                value_to_set = path_to_set_dict[param_path]
+                self._db.update(param_path, value_to_set)
+
             resp.body.response.set_resp.updated_obj_result.extend(update_obj_result_list)
 
         return resp
@@ -395,6 +393,36 @@ class UspRequestHandler(object):
             - Return the path that was created in a list
         """
         raise SetValidationError(9000, "Auto Creation for Set not currently supported")
+
+    def _validate_params(self, affected_path, obj_to_update, path_to_set_dict, update_inst_result, param_err_list):
+        """Validate the parameters related to the affected path"""
+        set_failure_err_list = []
+
+        # Loop through each parameter to validate it
+        for param_to_update in obj_to_update.param_setting:
+            param_path = affected_path + param_to_update.param
+            value_to_set = param_to_update.value
+            # TODO: Should validate that it is a writable parameter.
+            try:
+                curr_value = self._db.get(param_path)
+                if curr_value != value_to_set:
+                    path_to_set_dict[param_path] = value_to_set
+                else:
+                    self._logger.info("Ignoring %s: same value as current", param_path)
+
+                update_inst_result.result_param_map[param_to_update.param] = value_to_set
+            except agent_db.NoSuchPathError:
+                if param_to_update.required:
+                    set_failure_err_list.append(param_to_update.param)
+                else:
+                    param_err = usp.SetResp.ParameterError()
+                    param_err.param_path = param_path
+                    param_err.param_value = value_to_set
+                    param_err.err_code = 9000
+                    param_err.err_msg = "Parameter doesn't exist"
+                    param_err_list.append(param_err)
+
+        return set_failure_err_list
 
     def _process_operation(self, req):
         """Process an incoming Operate and generate a OperateResp"""
