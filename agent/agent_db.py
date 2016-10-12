@@ -157,6 +157,20 @@ class Database(object):
 
         return found_keys
 
+    def is_param_writable(self, param_path):
+        """Validate whether the supplied parameter path is readWrite (return True)"""
+        is_writable = False
+        dm_param_path = self._generic_dm_path(param_path)
+
+        # Validate that path is in the Implemented Data Model
+        if dm_param_path in self._dm:
+            if self._dm[dm_param_path] == "readWrite":
+                is_writable = True
+        else:
+            raise NoSuchPathError(dm_param_path)
+
+        return is_writable
+
     def find_instances(self, partial_path):
         """Retrieve a set of object instance paths that match the incoming path"""
         found_keys = []

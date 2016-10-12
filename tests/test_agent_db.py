@@ -306,6 +306,75 @@ def test_find_param_wildcard_searching():
 
 
 """
+ Tests for is_param_writable
+"""
+
+
+def test_is_param_writable_static_path():
+    my_mock = dm_mock = mock.mock_open(read_data=get_dm_file_contents())
+    db_mock = mock.mock_open(read_data=get_db_file_contents())
+    my_mock.side_effect = [dm_mock.return_value, db_mock.return_value]
+
+    with mock.patch("builtins.open", my_mock):
+        my_db = agent_db.Database("mock_dm.json", "mock_db.json")
+        is_param_writable1 = my_db.is_param_writable("Device.ControllerNumberOfEntries")
+        is_param_writable2 = my_db.is_param_writable("Device.LocalAgent.PeriodicInterval")
+
+    assert not is_param_writable1, "Attempted a 'readOnly' Parameter"
+    assert is_param_writable2, "Attempted a 'readWrite' Parameter"
+
+
+def test_is_param_writable_static_path_exception():
+    my_mock = dm_mock = mock.mock_open(read_data=get_dm_file_contents())
+    db_mock = mock.mock_open(read_data=get_db_file_contents())
+    my_mock.side_effect = [dm_mock.return_value, db_mock.return_value]
+
+    with mock.patch("builtins.open", my_mock):
+        my_db = agent_db.Database("mock_dm.json", "mock_db.json")
+        try:
+            my_db.is_param_writable("Device.NoSuchParameter")
+            assert False, "NoSuchPathError Expected"
+        except agent_db.NoSuchPathError:
+            pass
+
+
+def test_is_param_writable_instance_number_addressing():
+    my_mock = dm_mock = mock.mock_open(read_data=get_dm_file_contents())
+    db_mock = mock.mock_open(read_data=get_db_file_contents())
+    my_mock.side_effect = [dm_mock.return_value, db_mock.return_value]
+
+    with mock.patch("builtins.open", my_mock):
+        my_db = agent_db.Database("mock_dm.json", "mock_db.json")
+        is_param_writable1 = my_db.is_param_writable("Device.Controller.1.Enable")
+        is_param_writable2 = my_db.is_param_writable("Device.Controller.2.STOMP.Username")
+        is_param_writable3 = my_db.is_param_writable("Device.Services.HomeAutomation.1.Camera.1.Pic.10.URL")
+        is_param_writable4 = my_db.is_param_writable("Device.Services.HomeAutomation.1.Camera.1.Pic.1.URL")
+
+    assert is_param_writable1, "Attempted 'readWrite' with single instance number"
+    assert is_param_writable2, "Attempted 'readWrite' with single instance number and sub-object"
+    assert not is_param_writable3, "Attempted 'readOnly' with multiple instance numbers"
+    assert not is_param_writable4, "Attempted 'readOnly' with multiple instance numbers, but instances don't exist"
+
+
+def test_is_param_writable_wildcard_searching():
+    my_mock = dm_mock = mock.mock_open(read_data=get_dm_file_contents())
+    db_mock = mock.mock_open(read_data=get_db_file_contents())
+    my_mock.side_effect = [dm_mock.return_value, db_mock.return_value]
+
+    with mock.patch("builtins.open", my_mock):
+        my_db = agent_db.Database("mock_dm.json", "mock_db.json")
+        is_param_writable1 = my_db.is_param_writable("Device.Controller.*.Enable")
+        is_param_writable2 = my_db.is_param_writable("Device.Controller.*.STOMP.Username")
+        is_param_writable3 = my_db.is_param_writable("Device.Services.HomeAutomation.1.Camera.1.Pic.*.URL")
+        is_param_writable4 = my_db.is_param_writable("Device.Services.HomeAutomation.1.Camera.*.Pic.*.URL")
+
+    assert is_param_writable1, "Attempted 'readWrite' with wild-card for instance number"
+    assert is_param_writable2, "Attempted 'readWrite' with wild-card for instance number and sub-object"
+    assert not is_param_writable3, "Attempted 'readOnly' with multiple instance numbers and single wild-card"
+    assert not is_param_writable4, "Attempted 'readOnly' with single instance number and multiple wild-cards"
+
+
+"""
  Tests for find_instances
 """
 
