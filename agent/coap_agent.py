@@ -106,19 +106,18 @@ class CoapAgent(abstract_agent.AbstractAgent):
         """Return an instance of a binding specific AbstractPeriodicNotifHandler"""
         controller_host = self._db.get(controller_param_path + "CoAP.Host")
         controller_port = self._db.get(controller_param_path + "CoAP.Port")
-        return CoapPeriodicNotifHandler(agent_id, controller_id, controller_param_path,
-                                        subscription_id, param_path, periodic_interval,
-                                        controller_host, controller_port)
+        return CoapPeriodicNotifHandler(self._db, agent_id, controller_id, controller_param_path,
+                                        subscription_id, param_path, controller_host, controller_port)
 
 
 
 class CoapPeriodicNotifHandler(abstract_agent.AbstractPeriodicNotifHandler):
     """Issue a Periodic Notifications via a CoAP Binding"""
-    def __init__(self, from_id, to_id, controller_param_path, subscription_id, param, periodic_interval,
+    def __init__(self, database, from_id, to_id, controller_param_path, subscription_id, param,
                  controller_host, controller_port):
         """Initialize the CoAP Periodic Notification Handler"""
-        abstract_agent.AbstractPeriodicNotifHandler.__init__(self, controller_param_path, from_id, to_id,
-                                                             subscription_id, param, periodic_interval)
+        abstract_agent.AbstractPeriodicNotifHandler.__init__(self, database, controller_param_path,
+                                                             from_id, to_id, subscription_id, param)
         self._controller_host = controller_host
         self._controller_port = controller_port
 
@@ -127,6 +126,7 @@ class CoapPeriodicNotifHandler(abstract_agent.AbstractPeriodicNotifHandler):
         """Handle the CoAP Periodic Notification"""
         notif_issuer = CoapNotificationSender(notif, self._controller_host, self._controller_port)
         notif_issuer.start()
+        return True
 
 
 

@@ -150,8 +150,8 @@ class StompAgent(abstract_agent.AbstractAgent):
             self._logger.warning("Attempted to retrieve a Periodic Notification Handler for an unknown Controller [%s]",
                                  controller_param_path)
 
-        periodic_notif_handler = StompPeriodicNotifHandler(agent_id, controller_id, controller_param_path,
-                                                           subscription_id, param_path, periodic_interval)
+        periodic_notif_handler = StompPeriodicNotifHandler(self._db, agent_id, controller_id,
+                                                           controller_param_path, subscription_id, param_path)
         for controller_param_path in self._binding_dict:
             periodic_notif_handler.add_binding(controller_param_path,
                                                self._binding_dict[controller_param_path])
@@ -217,10 +217,10 @@ class StompBindingListener(threading.Thread):
 
 class StompPeriodicNotifHandler(abstract_agent.AbstractPeriodicNotifHandler):
     """Issue a Periodic Notifications via a STOMP Binding"""
-    def __init__(self, from_id, to_id, controller_param_path, subscription_id, param, periodic_interval):
+    def __init__(self, database, from_id, to_id, controller_param_path, subscription_id, param):
         """Initialize the STOMP Periodic Notification Handler"""
-        abstract_agent.AbstractPeriodicNotifHandler.__init__(self, controller_param_path, from_id, to_id,
-                                                             subscription_id, param, periodic_interval)
+        abstract_agent.AbstractPeriodicNotifHandler.__init__(self, database, controller_param_path,
+                                                             from_id, to_id, subscription_id, param)
         self._binding_dict = {}
         self._controller_param_path = controller_param_path
 

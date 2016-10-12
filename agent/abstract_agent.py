@@ -292,26 +292,38 @@ class AbstractAgent(object):
 class AbstractPeriodicNotifHandler(threading.Thread):
     """An Abstract Periodic Notification Handler that is extended for specific bindings such that
         a Periodic Notification is issued via the appropriate binding every Interval"""
-    def __init__(self, thread_name, from_id, to_id, subscription_id, param, periodic_interval):
+    def __init__(self, database, thread_name, from_id, to_id, subscription_id, param):
         """Initialize the Periodic Notification Handler"""
         threading.Thread.__init__(self, name="PeriodicNotifHandler-" + thread_name)
+        self._db = database
         self._param = param
         self._to_id = to_id
         self._from_id = from_id
         self._subscription_id = subscription_id
-        self._periodic_interval = periodic_interval
         self._logger = logging.getLogger(self.__class__.__name__)
 
 
     def run(self):
-        """Thread execution code - issue a Peridic Notification every periodic_interval seconds"""
+        """Thread execution code - issue a Periodic Notification every periodic_interval seconds"""
         binding_exists = True
+        periodic_interval_param_name = self._param + "PeriodicInterval"
+
         while binding_exists:
-            time.sleep(self._periodic_interval)
-            self._logger.info("Sending a Periodic Notification to %s", self._to_id)
-            notif = notify.PeriodicNotification(self._from_id, self._to_id,
-                                                self._subscription_id, self._param)
-            binding_exists = self._handle_periodic(notif)
+            try:
+                periodic_interval = int(self._db.get(periodic_interval_param_name))
+                self._logger.info("Waiting %d seconds before next Periodic Notification", periodic_interval)
+                time.sleep(periodic_interval)
+
+                self._logger.info("Sending a Periodic Notification to %s", self._to_id)
+                notif = notify.PeriodicNotification(self._from_id, self._to_id,
+                                                    self._subscription_id, self._param)
+                binding_exists = self._handle_periodic(notif)
+            except agent_db.NoSuchPathError:
+                binding_exists = False
+                self._logger.warning("Periodic Notification Failure : No Periodic Interval [%s]",
+                                     periodic_interval_param_name)
+
+        self._logger.warning("Periodic Notification Handler named [%s] shutting down", self.name)
 
 
     def _handle_periodic(self, notif):
