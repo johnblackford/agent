@@ -358,7 +358,7 @@ class UspRequestHandler(object):
             - Unless the inst_ident is an instance number, then create with next instance number
             - Return the path that was created in a list
         """
-        raise SetValidationError(9000, "Auto Creation for Set not currently supported")
+        raise SetValidationError(9000, "Auto Creation for Set is only applicable for unique-key based addressing")
 
     def _validate_set_params(self, affected_path, obj_to_update, path_to_set_dict, update_inst_result, param_err_list):
         """Validate the parameters related to the affected path"""
@@ -373,6 +373,7 @@ class UspRequestHandler(object):
 
             try:
                 if self._db.is_param_writable(param_path):
+                    # TODO: Also need to not allow sets against unmutable parameters and objects
                     curr_value = self._db.get(param_path)
                     if curr_value != value_to_set:
                         path_to_set_dict[param_path] = value_to_set
