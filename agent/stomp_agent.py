@@ -65,6 +65,11 @@ class StompAgent(abstract_agent.AbstractAgent):
 
         self._timeout = 15
         self._binding_dict = {}
+
+        # Initialize the underlying Agent DB MTP details for CoAP
+        self._db.update("Device.LocalAgent.MTP.1.Enable", False)  # Disable the CoAP MTP
+        self._db.update("Device.LocalAgent.MTP.2.Enable", True)   # Enable the STOMP MTP
+
         self.set_value_change_notif_poller(StompValueChangeNotifPoller(self._db))
 
         self._init_bindings()
@@ -100,58 +105,69 @@ class StompAgent(abstract_agent.AbstractAgent):
 
     def _init_bindings(self):
         """Initialize all Bindings from the Controller table"""
-        controller_instances = self._db.find_instances("Device.Controller.")
+        controller_instances = self._db.find_instances("Device.LocalAgent.Controller.")
 
-        for instance in controller_instances:
-            if self._db.get(instance + "Enable"):
-                self._handle_binding(instance)
+        for controller_path in controller_instances:
+            controller_id = self._db.get(controller_path + "EndpointID")
+
+            if self._db.get(controller_path + "Enable"):
+                mtp_instances = self._db.find_instances(controller_path + "MTP.")
+
+                for mtp_path in mtp_instances:
+                    if self._db.get(mtp_path + "Enable"):
+                        self._handle_binding(controller_id, mtp_path)
+                    else:
+                        mtp_name = self._db.get(mtp_path + "Name")
+                        self._logger.info("Skipping disabled MTP [%s] on Controller [%s]", mtp_name, controller_id)
             else:
-                controller_id = self._db.get(instance + "EndpointID")
                 self._logger.info("Skipping disabled Controller [%s]", controller_id)
 
-    def _handle_binding(self, controller_path):
+    def _handle_binding(self, controller_id, mtp_path):
         """Handle a Controller object"""
-        protocol = self._db.get(controller_path + "Protocol")
+        protocol = self._db.get(mtp_path + "Protocol")
 
         if protocol == self._get_supported_protocol():
-            host = self._db.get(controller_path + "STOMP.Host")
-            port = self._db.get(controller_path + "STOMP.Port")
-            username = self._db.get(controller_path + "STOMP.Username")
-            password = self._db.get(controller_path + "STOMP.Password")
+            host = self._db.get(mtp_path + "STOMP.Host")
+            port = self._db.get(mtp_path + "STOMP.Port")
+            username = self._db.get(mtp_path + "STOMP.Username")
+            password = self._db.get(mtp_path + "STOMP.Password")
 
             binding = stomp_usp_binding.StompUspBinding(host, port, username, password)
             binding.listen(self._endpoint_id)
-            self._binding_dict[controller_path] = binding
-            self.get_value_change_notif_poller().add_binding(controller_path, binding)
+            self._binding_dict[mtp_path] = binding
+            self.get_value_change_notif_poller().add_binding(mtp_path, binding)
         else:
-            self._logger.warning("Skipping controller with an invalid protocol [%s]", protocol)
+            mtp_name = self._db.get(mtp_path + "Name")
+            self._logger.warning("Skipping MTP [%s] on controller [%s] with an unsupported protocol [%s]",
+                                 mtp_name, controller_id, protocol)
 
     def _get_supported_protocol(self):
         """Return the supported Protocol as a String: CoAP, STOMP, HTTP/2, WebSockets"""
         return "STOMP"
 
-    def _get_notification_sender(self, notif, controller_id, controller_param_path):
+    def _get_notification_sender(self, notif, controller_id, mtp_param_path):
         """Return an instance of a binding specific AbstractNotificationSender"""
         notif_sender = None
 
-        if controller_param_path in self._binding_dict:
-            binding = self._binding_dict[controller_param_path]
+        if mtp_param_path in self._binding_dict:
+            binding = self._binding_dict[mtp_param_path]
             notif_sender = StompNotificationSender(notif, binding, controller_id)
         else:
-            self._logger.warning("Attempted to retrieve a Notification Sender for an unknown Controller [%s]",
-                                 controller_param_path)
+            self._logger.warning("Attempted to retrieve a Notification Sender for an unknown Controller/MTP [%s]",
+                                 mtp_param_path)
 
         return notif_sender
 
-    def _get_periodic_notif_handler(self, agent_id, controller_id, controller_param_path,
+    def _get_periodic_notif_handler(self, agent_id, controller_id, mtp_param_path,
                                     subscription_id, param_path, periodic_interval):
         """Return an instance of a binding specific AbstractPeriodicNotifHandler"""
-        if controller_param_path not in self._binding_dict:
-            self._logger.warning("Attempted to retrieve a Periodic Notification Handler for an unknown Controller [%s]",
-                                 controller_param_path)
+        if mtp_param_path not in self._binding_dict:
+            self._logger.warning(
+                "Attempted to retrieve a Periodic Notification Handler for an unknown Controller/MTP [%s]",
+                mtp_param_path)
 
         periodic_notif_handler = StompPeriodicNotifHandler(self._db, agent_id, controller_id,
-                                                           controller_param_path, subscription_id, param_path)
+                                                           mtp_param_path, subscription_id, param_path)
         for controller_param_path in self._binding_dict:
             periodic_notif_handler.add_binding(controller_param_path,
                                                self._binding_dict[controller_param_path])
@@ -217,12 +233,12 @@ class StompBindingListener(threading.Thread):
 
 class StompPeriodicNotifHandler(abstract_agent.AbstractPeriodicNotifHandler):
     """Issue a Periodic Notifications via a STOMP Binding"""
-    def __init__(self, database, from_id, to_id, controller_param_path, subscription_id, param):
+    def __init__(self, database, from_id, to_id, mtp_param_path, subscription_id, param):
         """Initialize the STOMP Periodic Notification Handler"""
-        abstract_agent.AbstractPeriodicNotifHandler.__init__(self, database, controller_param_path,
+        abstract_agent.AbstractPeriodicNotifHandler.__init__(self, database, mtp_param_path,
                                                              from_id, to_id, subscription_id, param)
         self._binding_dict = {}
-        self._controller_param_path = controller_param_path
+        self._mtp_param_path = mtp_param_path
 
 
     def add_binding(self, controller_param_path, binding):
@@ -238,14 +254,14 @@ class StompPeriodicNotifHandler(abstract_agent.AbstractPeriodicNotifHandler):
         """Handle the STOMP Periodic Notification"""
         binding_exists = True
 
-        if self._controller_param_path in self._binding_dict:
-            binding = self._binding_dict[self._controller_param_path]
+        if self._mtp_param_path in self._binding_dict:
+            binding = self._binding_dict[self._mtp_param_path]
             notif_issuer = StompNotificationSender(notif, binding, self._to_id)
             notif_issuer.start()
         else:
             binding_exists = False
-            self._logger.warning("Could not send a Periodic Notification to an unknown Controller [%s]",
-                                 self._controller_param_path)
+            self._logger.warning("Could not send a Periodic Notification to an unknown Controller/MTP [%s]",
+                                 self._mtp_param_path)
 
         return binding_exists
 
@@ -259,27 +275,27 @@ class StompValueChangeNotifPoller(abstract_agent.AbstractValueChangeNotifPoller)
         self._binding_dict = {}
 
 
-    def add_binding(self, controller_param_path, binding):
+    def add_binding(self, mtp_param_path, binding):
         """Add a STOMP Binding associated to a Controller Parameter Path"""
-        self._binding_dict[controller_param_path] = binding
+        self._binding_dict[mtp_param_path] = binding
 
-    def remove_binding(self, controller_param_path):
+    def remove_binding(self, mtp_param_path):
         """Remove a STOMP Binding"""
-        del self._binding_dict[controller_param_path]
+        del self._binding_dict[mtp_param_path]
 
 
-    def _handle_value_change(self, param, value, to_id, from_id, subscription_id, controller_param_path):
+    def _handle_value_change(self, param, value, to_id, from_id, subscription_id, mtp_param_path):
         """Handle the STOMP Value Change Processing"""
         notif = notify.ValueChangeNotification(from_id, to_id, subscription_id, param, value)
 
-        if controller_param_path in self._binding_dict:
-            binding = self._binding_dict[controller_param_path]
-            self._logger.info("Sending a ValueChange Notification to %s", to_id)
+        if mtp_param_path in self._binding_dict:
+            binding = self._binding_dict[mtp_param_path]
+            self._logger.info("Sending a ValueChange Notification to %s over MTP [%s]", to_id, mtp_param_path)
             notif_issuer = StompNotificationSender(notif, binding, to_id)
             notif_issuer.start()
         else:
-            self._logger.warning("Could not send ValueChange Notification to an unknown Controller [%s]",
-                                 controller_param_path)
+            self._logger.warning("Could not send ValueChange Notification to an unknown Controller/MTP [%s]",
+                                 mtp_param_path)
 
 
 

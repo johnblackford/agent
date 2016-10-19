@@ -46,6 +46,7 @@ SOFTWARE.
 """
 
 
+from agent import utils
 from agent import notify
 from agent import abstract_agent
 from agent import request_handler
@@ -58,6 +59,13 @@ class CoapAgent(abstract_agent.AbstractAgent):
     def __init__(self, dm_file, db_file, port=5683, cfg_file_name="cfg/agent.json", debug=False):
         """Initialize the CoAP Agent"""
         abstract_agent.AbstractAgent.__init__(self, dm_file, db_file, cfg_file_name)
+
+        # Initialize the underlying Agent DB MTP details for CoAP
+        url = "coap://" + utils.IPAddr.get_ip_addr() + ":" + port + "/usp"
+        self._db.update("Device.LocalAgent.MTP.1.Enable", True)   # Enable the CoAP MTP
+        self._db.update("Device.LocalAgent.MTP.1.CoAP.URL", url)  # Set the CoAP MTP URL
+        self._db.update("Device.LocalAgent.MTP.2.Enable", False)  # Disable the STOMP MTP
+
         self._binding = coap_usp_binding.ListeningCoapUspBinding(port, debug)
 
         self.set_value_change_notif_poller(CoapValueChangeNotifPoller(self._db))
@@ -95,36 +103,32 @@ class CoapAgent(abstract_agent.AbstractAgent):
         """Return the supported Protocol as a String: CoAP, STOMP, HTTP/2, WebSockets"""
         return "CoAP"
 
-    def _get_notification_sender(self, notif, controller_id, controller_param_path):
+    def _get_notification_sender(self, notif, controller_id, mtp_param_path):
         """Return an instance of a binding specific AbstractNotificationSender"""
-        controller_host = self._db.get(controller_param_path + "CoAP.Host")
-        controller_port = self._db.get(controller_param_path + "CoAP.Port")
-        return CoapNotificationSender(notif, controller_host, controller_port)
+        controller_url = self._db.get(mtp_param_path + "CoAP.URL")
+        return CoapNotificationSender(notif, controller_url)
 
-    def _get_periodic_notif_handler(self, agent_id, controller_id, controller_param_path,
+    def _get_periodic_notif_handler(self, agent_id, controller_id, mtp_param_path,
                                     subscription_id, param_path, periodic_interval):
         """Return an instance of a binding specific AbstractPeriodicNotifHandler"""
-        controller_host = self._db.get(controller_param_path + "CoAP.Host")
-        controller_port = self._db.get(controller_param_path + "CoAP.Port")
-        return CoapPeriodicNotifHandler(self._db, agent_id, controller_id, controller_param_path,
-                                        subscription_id, param_path, controller_host, controller_port)
+        controller_url = self._db.get(mtp_param_path + "CoAP.URL")
+        return CoapPeriodicNotifHandler(self._db, agent_id, controller_id, mtp_param_path,
+                                        subscription_id, param_path, controller_url)
 
 
 
 class CoapPeriodicNotifHandler(abstract_agent.AbstractPeriodicNotifHandler):
     """Issue a Periodic Notifications via a CoAP Binding"""
-    def __init__(self, database, from_id, to_id, controller_param_path, subscription_id, param,
-                 controller_host, controller_port):
+    def __init__(self, database, from_id, to_id, mtp_param_path, subscription_id, param, controller_url):
         """Initialize the CoAP Periodic Notification Handler"""
-        abstract_agent.AbstractPeriodicNotifHandler.__init__(self, database, controller_param_path,
+        abstract_agent.AbstractPeriodicNotifHandler.__init__(self, database, mtp_param_path,
                                                              from_id, to_id, subscription_id, param)
-        self._controller_host = controller_host
-        self._controller_port = controller_port
+        self._controller_url = controller_url
 
 
     def _handle_periodic(self, notif):
         """Handle the CoAP Periodic Notification"""
-        notif_issuer = CoapNotificationSender(notif, self._controller_host, self._controller_port)
+        notif_issuer = CoapNotificationSender(notif, self._controller_url)
         notif_issuer.start()
         return True
 
@@ -132,28 +136,25 @@ class CoapPeriodicNotifHandler(abstract_agent.AbstractPeriodicNotifHandler):
 
 class CoapValueChangeNotifPoller(abstract_agent.AbstractValueChangeNotifPoller):
     """Poll Parameters for Value Change Notifications via a CoAP Binding"""
-    def _handle_value_change(self, param, value, to_id, from_id, subscription_id, controller_param_path):
+    def _handle_value_change(self, param, value, to_id, from_id, subscription_id, mtp_param_path):
         """Handle the Binding Specific Value Change Processing"""
         notif = notify.ValueChangeNotification(from_id, to_id, subscription_id, param, value)
+        controller_url = self._db.get(mtp_param_path + "CoAP.URL")
 
-        controller_host = self._db.get(controller_param_path + "CoAP.Host")
-        controller_port = self._db.get(controller_param_path + "CoAP.Port")
-
-        self._logger.info("Sending a ValueChange Notification to %s", to_id)
-        notif_issuer = CoapNotificationSender(notif, controller_host, controller_port)
+        self._logger.info("Sending a ValueChange Notification to %s over MTP [%s]", to_id, mtp_param_path)
+        notif_issuer = CoapNotificationSender(notif, controller_url)
         notif_issuer.start()
 
 
 
 class CoapNotificationSender(abstract_agent.AbstractNotificationSender):
     """Send a USP Notification via a CoAP Binding"""
-    def __init__(self, notif, controller_host, controller_port):
+    def __init__(self, notif, controller_url):
         """Initialize the CoAP Notification Sender"""
         abstract_agent.AbstractNotificationSender.__init__(self, notif)
         self._binding = None
         self._resp_payload = None
-        self._controller_host = controller_host
-        self._controller_port = controller_port
+        self._controller_url = controller_url
 
 
     def _prepare_binding(self):
@@ -164,8 +165,9 @@ class CoapNotificationSender(abstract_agent.AbstractNotificationSender):
         """Send the notification via the binding"""
         self._logger.info("Sending a Notification for Subscription ID [%s] to [%s]",
                           msg.body.request.notify.subscription_id, msg.header.to_id)
-        self._binding.send_request(self._controller_host, self._controller_port,
-                                   payload=msg.SerializeToString(), callback=self._handle_response)
+        self._binding.send_request(self._controller_url,
+                                   payload=msg.SerializeToString(),
+                                   callback=self._handle_response)
 
     def _handle_response(self, resp_future):
         self._resp_payload = resp_future.result()

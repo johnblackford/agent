@@ -45,7 +45,7 @@ except ImportError:
 
 
 class ListeningCoapUspBinding(aiocoap.resource.Resource):
-    """A COAP to USP Binding"""
+    """A USP Binding for a CoAP Agent; Used to listen for Requests and send Responses"""
     def __init__(self, port=5683, debug=False):
         """Initialize the CoAP USP Binding for a USP Endpoint
             - 5683 is the default CoAP port, but 5684 is the default CoAPS port"""
@@ -134,7 +134,7 @@ class ListeningCoapUspBinding(aiocoap.resource.Resource):
 
 
 class SendingCoapUspBinding(object):
-    """A COAP to USP Binding for a Controller"""
+    """A USP Binding for a CoAP Agent; Used for Sending Notifications to a Controller"""
     def __init__(self, debug=False, new_event_loop=False):
         """Initialize the Binding and Create the COAP Client Context"""
         if new_event_loop:
@@ -147,9 +147,9 @@ class SendingCoapUspBinding(object):
         self._logger = logging.getLogger(self.__class__.__name__)
 
 
-    def send_request(self, host, port=5683, payload=None, callback=None):
+    def send_request(self, url, payload=None, callback=None):
         """Send a USP Message (Request) to the host/port specified"""
-        self._event_loop.run_until_complete(self._issue_request(host, port, payload, callback))
+        self._event_loop.run_until_complete(self._issue_request(url, payload, callback))
 
     def clean_up(self):
         """Clean up the COAP Binding - close the event loop"""
@@ -157,11 +157,10 @@ class SendingCoapUspBinding(object):
 
 
     @asyncio.coroutine
-    def _issue_request(self, host, port, payload, callback):
+    def _issue_request(self, url, payload, callback):
         """Send a USP Message (Request) to the host/port specified"""
         msg = aiocoap.Message(code=aiocoap.Code.GET, payload=payload)
-        uri = self._build_uri(host, port, "usp")
-        msg.set_request_uri(uri)
+        msg.set_request_uri(url)
 
         self._logger.debug("Creating a COAP Client Context")
         context = yield from aiocoap.Context.create_client_context()
@@ -172,7 +171,7 @@ class SendingCoapUspBinding(object):
             self._logger.debug("Adding a callback [%s] to this request", callback)
             req_future.add_done_callback(callback)
 
-        self._logger.info("Using the following URI in the COAP message: %s", uri)
+        self._logger.info("Using the following URI in the COAP message: %s", url)
         try:
             self._logger.info("Sending Message via COAP Binding")
             self._logger.debug("Message contents: [%s]", msg)
@@ -187,25 +186,6 @@ class SendingCoapUspBinding(object):
         else:
             self._logger.debug("Setting the Future's Result to the response")
             req_future.set_result(resp.payload)
-
-    def _build_uri(self, host, port=0, resource="usp", ssl=False):
-        """Construct a proper COAP URI from the incoming information"""
-        coap_port = port
-
-        if ssl:
-            scheme = "coaps"
-            if port == 0:
-                # 5684 is the default COAPS port
-                coap_port = 5684
-        else:
-            scheme = "coap"
-            if port == 0:
-                # 5683 is the default COAP port
-                coap_port = 5683
-
-        uri = "{}://{}:{}/{}".format(scheme, host, coap_port, resource)
-
-        return uri
 
 
 

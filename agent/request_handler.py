@@ -453,7 +453,7 @@ class UspRequestHandler(object):
         resp = usp.Msg()
         op_result_list = []
         command = req.body.request.operate.command
-        product_class = self._db.get("Device.LocalAgent.ProductClass")
+        product_class = self._db.get("Device.DeviceInfo.ProductClass")
         self._logger.info("Processing an Operate Request...")
 
         #TODO: This is hard-coded for the Camera, but needs to be dynamic

@@ -106,7 +106,7 @@ class AbstractAgent(object):
 
     def init_subscriptions(self):
         """Initialize the Subscription Handling"""
-        subscription_instances = self._db.find_instances("Device.Subscription.")
+        subscription_instances = self._db.find_instances("Device.LocalAgent.Subscription.")
 
         for instance in subscription_instances:
             if self._db.get(instance + "Enable"):
@@ -156,7 +156,7 @@ class AbstractAgent(object):
 
     def _load_services(self):
         """Load Home Automation Services Helpers"""
-        product_class = self._db.get("Device.LocalAgent.ProductClass")
+        product_class = self._db.get("Device.DeviceInfo.ProductClass")
         self._logger.info("Loading Services for Product Class [%s]", product_class)
 
         if product_class == "RPi_Motion":
@@ -204,25 +204,26 @@ class AbstractAgent(object):
         supported_notifs = ["Boot", "ValueChange", "Periodic"]
         subscription_id = self._db.get(subscription_path + "ID")
         notif_type = self._db.get(subscription_path + "NotifType")
-        controller_path = self._db.get(subscription_path + "Controller")
+        controller_path = self._db.get(subscription_path + "Recipient")
 
         if notif_type in supported_notifs:
             if self._db.get(controller_path + "Enable"):
-                controller_protocol = self._db.get(controller_path + "Protocol")
+                mtp_path_list = self._get_valid_mtp_paths(controller_path)
 
-                if controller_protocol == self._get_supported_protocol():
-                    controller_id = self._db.get(controller_path + "EndpointID")
+                if len(mtp_path_list) > 0:
+                    for mtp_path in mtp_path_list:
+                        controller_id = self._db.get(controller_path + "EndpointID")
 
-                    if notif_type == "Boot":
-                        self._handle_boot(controller_id, controller_path, subscription_id)
-                    elif notif_type == "Periodic":
-                        self._handle_periodic(subscription_path, controller_id, controller_path, subscription_id)
-                    elif notif_type == "ValueChange":
-                        self._handle_value_change(subscription_path, controller_id, controller_path, subscription_id)
+                        if notif_type == "Boot":
+                            self._handle_boot(controller_id, mtp_path, subscription_id)
+                        elif notif_type == "Periodic":
+                            self._handle_periodic(subscription_path, controller_id, mtp_path, subscription_id)
+                        elif notif_type == "ValueChange":
+                            self._handle_value_change(subscription_path, controller_id, mtp_path, subscription_id)
                 else:
                     self._logger.warning(
-                        "Skipping Subscription [%s] because it references a controller with an invalid protocol [%s]",
-                        subscription_id, controller_protocol)
+                        "Skipping Subscription [%s] because there are no enabled/matching MTPs for the controller",
+                        subscription_id)
             else:
                 self._logger.warning("Skipping Subscription [%s] because it references a disabled controller",
                                      subscription_id)
@@ -230,45 +231,61 @@ class AbstractAgent(object):
             self._logger.warning("Skipping Subscription [%s] because it has an unhandled notification type [%s]",
                                  subscription_id, notif_type)
 
-    def _handle_boot(self, controller_id, controller_path, subscription_id):
+    def _get_valid_mtp_paths(self, controller_path):
+        """Find all valid MTPs that are Enabled and have a matching Protocol on the Controller provided"""
+        mtp_path_list = []
+        mtp_instances = self._db.find_instances(controller_path + "MTP.")
+
+        for mtp_path in mtp_instances:
+            if self._db.get(mtp_path + "Enable"):
+                controller_protocol = self._db.get(mtp_path + "Protocol")
+
+                if controller_protocol == self._get_supported_protocol():
+                    mtp_path_list.append(mtp_path)
+
+        return mtp_path_list
+
+    def _handle_boot(self, controller_id, mtp_path, subscription_id):
         """Handle a Subscription for a Boot Notification"""
         boot_notif = notify.BootNotification(self._endpoint_id, controller_id,
                                              subscription_id, self._db)
-        notif_sender = self._get_notification_sender(boot_notif, controller_id,
-                                                     controller_path)
+        notif_sender = self._get_notification_sender(boot_notif, controller_id, mtp_path)
         if notif_sender is not None:
             self._boot_notif_sender_list.append(notif_sender)
-            self._logger.info("Processed Boot Subscription [%s] for Controller [%s]",
-                              subscription_id, controller_id)
+            self._logger.info("Processed Boot Subscription [%s] for MTP [%s] on Controller [%s]",
+                              subscription_id, mtp_path, controller_id)
         else:
             self._logger.warning(
                 "Skipping Subscription [%s] because Notification Sender not found",
                 subscription_id)
 
-    def _handle_periodic(self, subscription_path, controller_id, controller_path, subscription_id):
+    def _handle_periodic(self, subscription_path, controller_id, mtp_path, subscription_id):
         """Handle a Subscription for a Periodic Notification"""
-        param_path = self._db.get(subscription_path + "ParamPath")
+        ref_param_list = self._db.get(subscription_path + "ReferenceList")
+        param_path = ref_param_list.split(",")[0]
         periodic_interval = int(self._db.get(param_path + "PeriodicInterval"))
         periodic_handler = self._get_periodic_notif_handler(self._endpoint_id, controller_id,
-                                                            controller_path, subscription_id,
+                                                            mtp_path, subscription_id,
                                                             param_path, periodic_interval)
         if periodic_handler is not None:
             self._periodic_handler_list.append(periodic_handler)
-            self._logger.info("Processed Periodic Subscription [%s] for Controller [%s]",
-                              subscription_id, controller_id)
+            self._logger.info("Processed Periodic Subscription [%s] for MTP [%s] on Controller [%s]",
+                              subscription_id, mtp_path, controller_id)
         else:
             self._logger.warning(
                 "Skipping Subscription [%s] because Periodic Notification Handler not found",
                 subscription_id)
 
-    def _handle_value_change(self, subscription_path, controller_id, controller_path, subscription_id):
+    def _handle_value_change(self, subscription_path, controller_id, mtp_path, subscription_id):
         """Handle a Subscription for a ValueChange Notification"""
-        param_path = self._db.get(subscription_path + "ParamPath")
+        ref_list = self._db.get(subscription_path + "ReferenceList")
+        ref_param_list = ref_list.split(",")
         if self._value_change_notif_poller is not None:
-            self._value_change_notif_poller.add_param(param_path, self._endpoint_id,
-                                                      controller_id, controller_path, subscription_id)
-            self._logger.info("Processed ValueChange Subscription [%s] for Controller [{%s]",
-                              subscription_id, controller_id)
+            for param_path in ref_param_list:
+                self._value_change_notif_poller.add_param(param_path, self._endpoint_id,
+                                                          controller_id, mtp_path, subscription_id)
+                self._logger.info("Processed ValueChange Subscription [%s] for MTP [%s] on Controller [%s] - %s",
+                                  subscription_id, mtp_path, controller_id, param_path)
         else:
             self._logger.warning(
                 "Skipping Subscription [%s] because ValueChange Notification Poller isn't configured",
@@ -278,11 +295,11 @@ class AbstractAgent(object):
         """Return the supported Protocol as a String: CoAP, STOMP, HTTP/2, WebSockets"""
         raise NotImplementedError()
 
-    def _get_notification_sender(self, notif, controller_id, controller_param_path):
+    def _get_notification_sender(self, notif, controller_id, mtp_path):
         """Return an instance of a binding specific AbstractNotificationSender"""
         raise NotImplementedError()
 
-    def _get_periodic_notif_handler(self, agent_id, controller_id, controller_param_path,
+    def _get_periodic_notif_handler(self, agent_id, controller_id, mtp_path,
                                     subscription_id, param_path, periodic_interval):
         """Return an instance of a binding specific AbstractPeriodicNotifHandler"""
         raise NotImplementedError()
@@ -337,7 +354,7 @@ class AbstractValueChangeNotifPoller(threading.Thread):
         ValueChange Notifications can be issued when a Parameter's Value has Changed"""
     TO_ID = "to.id"
     FROM_ID = "from.id"
-    CONTROLLER = "controller.path"
+    MTP = "mtp.path"
     SUBSCRIPTION_ID = "subscription.id"
 
     def __init__(self, agent_database, poll_duration=0.5):
@@ -369,18 +386,18 @@ class AbstractValueChangeNotifPoller(threading.Thread):
                         to_id = notif_details[self.TO_ID]
                         from_id = notif_details[self.FROM_ID]
                         subscription_id = notif_details[self.SUBSCRIPTION_ID]
-                        controller_param_path = notif_details[self.CONTROLLER]
+                        mtp_param_path = notif_details[self.MTP]
                         self._handle_value_change(param, value, to_id, from_id,
-                                                  subscription_id, controller_param_path)
+                                                  subscription_id, mtp_param_path)
 
-    def add_param(self, param, agent_id, controller_id, controller_param_path, subscription_id):
+    def add_param(self, param, agent_id, controller_id, mtp_param_path, subscription_id):
         """Add a Parameter to the Polling List"""
         self._logger.info("Adding %s to the ValueChange Notification Poller", param)
         value_change_notif_details_dict = {}
         value_change_notif_details_dict[self.FROM_ID] = agent_id
         value_change_notif_details_dict[self.TO_ID] = controller_id
         value_change_notif_details_dict[self.SUBSCRIPTION_ID] = subscription_id
-        value_change_notif_details_dict[self.CONTROLLER] = controller_param_path
+        value_change_notif_details_dict[self.MTP] = mtp_param_path
 
         with self._cache_lock:
             self._param_cache[param] = self._db.get(param)
@@ -396,7 +413,7 @@ class AbstractValueChangeNotifPoller(threading.Thread):
             del self._notif_details_dict[param]
 
 
-    def _handle_value_change(self, param, value, to_id, from_id, subscription_id, controller_param_path):
+    def _handle_value_change(self, param, value, to_id, from_id, subscription_id, mtp_param_path):
         """Handle the Binding Specific Value Change Processing"""
         raise NotImplementedError()
 

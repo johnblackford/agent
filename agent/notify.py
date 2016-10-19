@@ -80,9 +80,9 @@ class BootNotification(Notification):
         """Generate an appropriate USP Notification"""
         notif = usp.Msg()
         self._init_notif(notif)
-        boot_param_list = ["Device.LocalAgent.ManufacturerOUI",
-                           "Device.LocalAgent.ProductClass",
-                           "Device.LocalAgent.SerialNumber",
+        boot_param_list = ["Device.DeviceInfo.ManufacturerOUI",
+                           "Device.DeviceInfo.ProductClass",
+                           "Device.DeviceInfo.SerialNumber",
                            "Device.LocalAgent.X_ARRIS-COM_IPAddr"]
 
         notif.body.request.notify.boot.command_key = ""
