@@ -61,7 +61,7 @@ class CoapAgent(abstract_agent.AbstractAgent):
         abstract_agent.AbstractAgent.__init__(self, dm_file, db_file, cfg_file_name)
 
         # Initialize the underlying Agent DB MTP details for CoAP
-        url = "coap://" + utils.IPAddr.get_ip_addr() + ":" + port + "/usp"
+        url = "coap://" + utils.IPAddr.get_ip_addr() + ":" + str(port) + "/usp"
         self._db.update("Device.LocalAgent.MTP.1.Enable", True)   # Enable the CoAP MTP
         self._db.update("Device.LocalAgent.MTP.1.CoAP.URL", url)  # Set the CoAP MTP URL
         self._db.update("Device.LocalAgent.MTP.2.Enable", False)  # Disable the STOMP MTP
