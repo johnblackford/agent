@@ -282,10 +282,15 @@ class AbstractAgent(object):
         ref_param_list = ref_list.split(",")
         if self._value_change_notif_poller is not None:
             for param_path in ref_param_list:
-                self._value_change_notif_poller.add_param(param_path, self._endpoint_id,
-                                                          controller_id, mtp_path, subscription_id)
-                self._logger.info("Processed ValueChange Subscription [%s] for MTP [%s] on Controller [%s] - %s",
-                                  subscription_id, mtp_path, controller_id, param_path)
+                try:
+                    self._value_change_notif_poller.add_param(param_path, self._endpoint_id,
+                                                              controller_id, mtp_path, subscription_id)
+                    self._logger.info("Processed ValueChange Subscription [%s] for MTP [%s] on Controller [%s] - %s",
+                                      subscription_id, mtp_path, controller_id, param_path)
+                except agent_db.NoSuchPathError:
+                    self._logger.warning(
+                        "Skipping ValueChange on Parameter [%s]; Subscription [%s] - No Such Parameter",
+                        param_path, subscription_id)
         else:
             self._logger.warning(
                 "Skipping Subscription [%s] because ValueChange Notification Poller isn't configured",
