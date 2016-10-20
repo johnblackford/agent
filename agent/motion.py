@@ -76,7 +76,7 @@ class PersistDetectedMotion(DetectMotion):
 
     def act_on_detected_motion(self, gpio_pin):
         last_trigger_as_int = 0
-        min_freq = self._db.get(self.MIN_TRIGGER_FREQ)
+        min_freq = int(self._db.get(self.MIN_TRIGGER_FREQ))
         last_trigger = self._db.get(self.LAST_TRIGGER_TIME)
 
         if last_trigger != "0001-01-01T00:00:00Z":
