@@ -159,7 +159,7 @@ class SendingCoapUspBinding(object):
     @asyncio.coroutine
     def _issue_request(self, url, payload, callback):
         """Send a USP Message (Request) to the host/port specified"""
-        msg = aiocoap.Message(code=aiocoap.Code.GET, payload=payload)
+        msg = aiocoap.Message(code=aiocoap.Code.POST, payload=payload)
         msg.set_request_uri(url)
 
         self._logger.debug("Creating a COAP Client Context")
