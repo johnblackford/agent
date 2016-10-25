@@ -160,6 +160,7 @@ class SendingCoapUspBinding(object):
     def _issue_request(self, url, payload, callback):
         """Send a USP Message (Request) to the host/port specified"""
         msg = aiocoap.Message(code=aiocoap.Code.POST, payload=payload)
+        msg.opt.content_format = 42         ### Per CoAP this is application/octet-stream
         msg.set_request_uri(url)
 
         self._logger.debug("Creating a COAP Client Context")
