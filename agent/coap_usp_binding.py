@@ -78,6 +78,7 @@ class ListeningCoapUspBinding(aiocoap.resource.Resource):
             resp_code = coap_msg.get_resp_code()
 
         response = aiocoap.Message(code=resp_code, payload=coap_msg.get_payload())
+        response.opt.content_format = 42  ### Per CoAP this is application/octet-stream
 
         return response
 
@@ -99,6 +100,7 @@ class ListeningCoapUspBinding(aiocoap.resource.Resource):
             resp_code = coap_msg.get_resp_code()
 
         response = aiocoap.Message(code=resp_code, payload=coap_msg.get_payload())
+        response.opt.content_format = 42  ### Per CoAP this is application/octet-stream
 
         return response
 
