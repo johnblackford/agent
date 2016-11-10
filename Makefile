@@ -26,4 +26,4 @@ runbin:
 	python3 bin/agent.py -t test
 
 runcoap:
-	python3 bin/agent.py -t test -c
+	python3 bin/agent.py -t test -c --coap-port 15683
