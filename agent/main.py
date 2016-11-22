@@ -41,8 +41,9 @@ from agent import stomp_agent
 
 class Agent(object):
     """A USP Agent Wrapper"""
-    def __init__(self, cfg_file_name, log_file_name, log_level=logging.INFO, debug=False):
+    def __init__(self, cfg_file_name, log_file_name, log_level=logging.INFO):
         """Initialize the Agent"""
+        debug = (log_level == logging.DEBUG)
         logging.basicConfig(filename=log_file_name, level=log_level,
                             format='%(asctime)-15s %(name)s %(levelname)-8s %(message)s')
 

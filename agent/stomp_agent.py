@@ -1,24 +1,24 @@
+# Copyright (c) 2016 John Blackford
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
-Copyright (c) 2016 John Blackford
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-
 #
 # File Name: stomp_agent.py
 #
@@ -26,33 +26,25 @@ SOFTWARE.
 #
 # Functionality:
 #   Class: StompAgent(abstract_agent.AbstractAgent)
-#     __init__(dm_file, db_file, cfg_file_name="cfg/agent.json", debug=False)
+#     __init__(dm_file, db_file, cfg_file_name="cfg/agent.json")
 #     start_listening(timeout=15)
 #     clean_up()
 #   Class: StompBindingListener(threading.Thread)
-#     __init__(thread_name, binding, msg_handler, timeout=15)
-#     run()
 #   Class: StompPeriodicNotifHandler(abstract_agent.AbstractPeriodicNotifHandler)
-#     __init__(from_id, to_id, controller_param_path, subscription_id, param, periodic_interval)
+#     __init__(database, mtp_param_path, from_id, to_id, subscription_id, param)
 #     add_binding(controller_param_path, binding)
 #     remove_binding(controller_param_path)
 #   Class: StompValueChangeNotifPoller(abstract_agent.AbstractValueChangeNotifPoller)
 #     __init__(agent_db, poll_duration=0.5)
-#     add_binding(controller_param_path, binding)
-#     remove_binding(controller_param_path)
-#     get_value_change_details(agent_id, controller_id, controller_param_path, subscription_id)
-#   Class: StompNotificationSender(abstract_agent.AbstractNotificationSender)
-#     __init__(notif, binding, to_id)
+#     add_binding(mtp_param_path, binding)
+#     remove_binding(mtp_param_path)
+#     get_value_change_details(param, value, to_id, from_id, subscription_id, mtp_param_path)
 #
 """
 
 
-import logging
-import threading
-
 from agent import notify
 from agent import abstract_agent
-from agent import request_handler
 from agent import stomp_usp_binding
 
 
@@ -62,8 +54,6 @@ class StompAgent(abstract_agent.AbstractAgent):
     def __init__(self, dm_file, db_file, cfg_file_name="cfg/agent.json"):
         """Initialize the STOMP Agent"""
         abstract_agent.AbstractAgent.__init__(self, dm_file, db_file, cfg_file_name)
-
-        self._timeout = 15
         self._binding_dict = {}
 
         # Initialize the underlying Agent DB MTP details for CoAP
@@ -76,11 +66,7 @@ class StompAgent(abstract_agent.AbstractAgent):
         self.init_subscriptions()
 
 
-    def set_listen_timeout(self, timeout):
-        """Override the default 15 second listening timeout"""
-        self._timeout = timeout
-
-    def start_listening(self):
+    def start_listening(self, timeout=15):
         """Start listening for messages and process them"""
         binding_listener_list = []
         abstract_agent.AbstractAgent.start_listening(self)
@@ -89,7 +75,7 @@ class StompAgent(abstract_agent.AbstractAgent):
         for binding_key in self._binding_dict:
             msg_handler = self.get_msg_handler()
             binding = self._binding_dict[binding_key]
-            listener = StompBindingListener(binding_key, binding, msg_handler, self._timeout)
+            listener = StompBindingListener(binding_key, binding, msg_handler, timeout)
             listener.start()
             binding_listener_list.append(listener)
 
@@ -150,8 +136,9 @@ class StompAgent(abstract_agent.AbstractAgent):
         notif_sender = None
 
         if mtp_param_path in self._binding_dict:
+            to_addr = "/queue/" + controller_id
             binding = self._binding_dict[mtp_param_path]
-            notif_sender = StompNotificationSender(notif, binding, controller_id)
+            notif_sender = abstract_agent.NotificationSender(notif, binding, to_addr)
         else:
             self._logger.warning("Attempted to retrieve a Notification Sender for an unknown Controller/MTP [%s]",
                                  mtp_param_path)
@@ -159,15 +146,15 @@ class StompAgent(abstract_agent.AbstractAgent):
         return notif_sender
 
     def _get_periodic_notif_handler(self, agent_id, controller_id, mtp_param_path,
-                                    subscription_id, param_path, periodic_interval):
+                                    subscription_id, param_path):
         """Return an instance of a binding specific AbstractPeriodicNotifHandler"""
         if mtp_param_path not in self._binding_dict:
             self._logger.warning(
                 "Attempted to retrieve a Periodic Notification Handler for an unknown Controller/MTP [%s]",
                 mtp_param_path)
 
-        periodic_notif_handler = StompPeriodicNotifHandler(self._db, agent_id, controller_id,
-                                                           mtp_param_path, subscription_id, param_path)
+        periodic_notif_handler = StompPeriodicNotifHandler(self._db, mtp_param_path, agent_id, controller_id,
+                                                           subscription_id, param_path)
         for controller_param_path in self._binding_dict:
             periodic_notif_handler.add_binding(controller_param_path,
                                                self._binding_dict[controller_param_path])
@@ -176,64 +163,17 @@ class StompAgent(abstract_agent.AbstractAgent):
 
 
 
-class StompBindingListener(threading.Thread):
-    """Listen to a specific STOMP Binding"""
-    def __init__(self, thread_name, binding, msg_handler, timeout=15):
-        """Initialize the STOMP Binding Listener"""
-        threading.Thread.__init__(self, name="StompBindingListener-" + thread_name)
-        self._binding = binding
-        self._timeout = timeout
-        self._msg_handler = msg_handler
-        self._logger = logging.getLogger(self.__class__.__name__)
-
-    def run(self):
-        """Start listening for messages and process them"""
-        # Listen for incoming messages
-        msg_payloads = self._receive_msgs()
-        for payload in msg_payloads:
-            if payload is not None:
-                self._handle_request(payload)
-
-
-    def _receive_msgs(self):
-        """Receive incoming messages from the binding"""
-        try:
-            while True:
-                payload = self._binding.get_msg(self._timeout)
-                yield payload
-        except GeneratorExit:
-            self._logger.info("STOMP Binding Listener is Shutting Down as requested...")
-
-    def _handle_request(self, payload):
-        """Handle a Request/Response interaction"""
-        resp = None
-
-        try:
-            req, resp, serialized_resp = self._msg_handler.handle_request(payload)
-            abstract_agent.AbstractAgent.log_messages(self._logger, req, resp)
-
-            # Send the message either to the "from" or "reply-to" contained in the request
-            #  "reply-to" is optional and overrides the "from"
-            send_to = req.header.from_id
-            if len(req.header.reply_to_id) > 0:
-                send_to = req.header.reply_to_id
-
-            self._binding.send_msg(serialized_resp, send_to)
-
-            #TODO: Check with the self._msg_handler if should shutdown, and raise a GeneratorExist
-        except stomp_usp_binding.StompProtocolBindingError as err:
-            self._logger.error("USP Binding Error: %s", err)
-        except request_handler.ProtocolViolationError:
-            # Error already logged in the USP Protocol Tool, nothing to do
-            pass
-
-        return resp
+class StompBindingListener(abstract_agent.BindingListener):
+    """A STOMP Specific implementation of an Abstract BindingListener"""
+    def _get_addr_from_id(self, to_endpoint_id):
+        """STOMP Specific implementation of how to get an Endpoint Address from an Endpoint ID"""
+        return "/queue/" + to_endpoint_id
 
 
 
 class StompPeriodicNotifHandler(abstract_agent.AbstractPeriodicNotifHandler):
     """Issue a Periodic Notifications via a STOMP Binding"""
-    def __init__(self, database, from_id, to_id, mtp_param_path, subscription_id, param):
+    def __init__(self, database, mtp_param_path, from_id, to_id, subscription_id, param):
         """Initialize the STOMP Periodic Notification Handler"""
         abstract_agent.AbstractPeriodicNotifHandler.__init__(self, database, mtp_param_path,
                                                              from_id, to_id, subscription_id, param)
@@ -255,9 +195,13 @@ class StompPeriodicNotifHandler(abstract_agent.AbstractPeriodicNotifHandler):
         binding_exists = True
 
         if self._mtp_param_path in self._binding_dict:
+            to_addr = "/queue/" + self._to_id
+            msg = notif.generate_notif_msg()
             binding = self._binding_dict[self._mtp_param_path]
-            notif_issuer = StompNotificationSender(notif, binding, self._to_id)
-            notif_issuer.start()
+
+            self._logger.info("Sending a Periodic Notification to ID [%s] over MTP [%s] at: %s",
+                              self._to_id, self._mtp_param_path, to_addr)
+            binding.send_msg(msg.SerializeToString(), to_addr)
         else:
             binding_exists = False
             self._logger.warning("Could not send a Periodic Notification to an unknown Controller/MTP [%s]",
@@ -289,36 +233,13 @@ class StompValueChangeNotifPoller(abstract_agent.AbstractValueChangeNotifPoller)
         notif = notify.ValueChangeNotification(from_id, to_id, subscription_id, param, value)
 
         if mtp_param_path in self._binding_dict:
+            to_addr = "/queue/" + to_id
+            msg = notif.generate_notif_msg()
             binding = self._binding_dict[mtp_param_path]
-            self._logger.info("Sending a ValueChange Notification to %s over MTP [%s]", to_id, mtp_param_path)
-            notif_issuer = StompNotificationSender(notif, binding, to_id)
-            notif_issuer.start()
+
+            self._logger.info("Sending a ValueChange Notification to ID [%s] over MTP [%s] at: %s",
+                              to_id, mtp_param_path, to_addr)
+            binding.send_msg(msg.SerializeToString(), to_addr)
         else:
             self._logger.warning("Could not send ValueChange Notification to an unknown Controller/MTP [%s]",
                                  mtp_param_path)
-
-
-
-class StompNotificationSender(abstract_agent.AbstractNotificationSender):
-    """Send a Notification via a STOMP Binding"""
-    def __init__(self, notif, binding, to_id):
-        """Initialize the STOMP Notification Sender"""
-        abstract_agent.AbstractNotificationSender.__init__(self, notif)
-        self._to_id = to_id
-        self._binding = binding
-        self._logger = logging.getLogger(self.__class__.__name__)
-
-
-    def _prepare_binding(self):
-        """Perform actions needed to create a binding or prepare an existing binding to send a message"""
-        pass
-
-    def _send_notification(self, msg):
-        """Send the notification via the binding"""
-        self._logger.info("Sending a Notification for Subscription ID [%s] to [%s]",
-                          msg.body.request.notify.subscription_id, msg.header.to_id)
-        self._binding.send_msg(msg.SerializeToString(), self._to_id)
-
-    def _clean_up_binding(self):
-        """Perform actions needed to delete a binding or clean-up an existing binding that sent the message"""
-        pass

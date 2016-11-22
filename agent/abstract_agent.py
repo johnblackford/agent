@@ -1,57 +1,59 @@
+# Copyright (c) 2016 John Blackford
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
-Copyright (c) 2016 John Blackford
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-
 #
 # File Name: abstract_agent.py
 #
 # Description: An Abstract USP Agent to be used as a basis for a specific binding
 #
-# Functionality:
+# Class Structure:
 #   Class: AbstractAgent(object)
 #     __init__(dm_file, db_file, cfg_file_name, debug=False)
 #     get_msg_handler()
+#     get_value_change_notif_poller()
 #     set_value_change_notif_poller(poller)
 #     init_subscriptions()
 #     start_listening()
 #     clean_up() :: Abstract Method
 #     _get_supported_protocol() :: Abstract Method
-#     _get_notification_sender(notif, controller_id, controller_param_path) :: Abstract Method
-#     _get_periodic_notif_handler(agent_id, controller_id, controller_param_path,
-#                                 subscription_id, param_path, periodic_interval) :: Abstract Method
+#     _get_notification_sender(notif, controller_id, mtp_path) :: Abstract Method
+#     _get_periodic_notif_handler(agent_id, controller_id, mtp_path,
+#                                 subscription_id, param_path) :: Abstract Method
+#   Class: BindingListener(threading.Thread)
+#     __init__(thread_name, binding, msg_handler, timeout=15)
+#     run()
+#     _get_addr_from_id(to_endpoint_id) :: Abstract Method
 #   Class: AbstractPeriodicNotifHandler(threading.Thread)
-#     __init__(thread_name, from_id, to_id, subscription_id, param, periodic_interval)
+#     __init__(database, thread_name, from_id, to_id, subscription_id, param)
 #     run()
 #     _handle_periodic(notif) :: Abstract Method
 #   Class: AbstractValueChangeNotifPoller(threading.Thread)
 #     __init__(agent_db, poll_duration)
 #     run()
-#     add_param(param, value_change_notif_details)
+#     add_param(param, agent_id, controller_id, mtp_param_path, subscription_id)
 #     remove_param(param)
-#     _handle_value_change(param, value, notif_details) :: Abstract Method
-#   Class: AbstractNotificationSender(threading.Thread)
+#     _handle_value_change(param, value, to_id, from_id, subscription_id, mtp_param_path) :: Abstract Method
+#   Class: NotificationSender(threading.Thread)
 #     __init__(self, notif):
 #     run():
-#     _prepare_binding() :: Abstract Method
-#     _send_notification(msg) :: Abstract Method
-#     _clean_up_binding() :: Abstract Method
 #
 """
 
@@ -115,11 +117,11 @@ class AbstractAgent(object):
                 subscription_id = self._db.get(instance + "ID")
                 self._logger.info("Skipping disabled Subscription [%s]", subscription_id)
 
-    def start_listening(self):
+    def start_listening(self, timeout=15):
         """
         Start listening for messages and process them
         NOTE: This does not actually listen to any binding, that needs to be done by the
-               class that extends the AbstractAgent by overriding this method
+               class that extends the AbstractAgent by extending/overriding this method
         """
         # Start all of the Boot Notification issuers
         for boot_notif in self._boot_notif_sender_list:
@@ -138,20 +140,6 @@ class AbstractAgent(object):
     def clean_up(self):
         """Clean-up and prepare for shutdown"""
         raise NotImplementedError()
-
-
-    @staticmethod
-    def log_messages(logger, req, resp):
-        """Logging Helper Static Method"""
-        logger.info("Handled a [%s] Request",
-                    req.body.request.WhichOneof("request"))
-        if resp.body.HasField("response"):
-            logger.info("Sending a [%s] Response",
-                        resp.body.response.WhichOneof("response"))
-        elif resp.body.HasField("error"):
-            logger.info("Responding with an Error")
-        else:
-            logger.warning("Sending an Unknown Response")
 
 
     def _load_services(self):
@@ -263,10 +251,8 @@ class AbstractAgent(object):
         """Handle a Subscription for a Periodic Notification"""
         ref_param_list = self._db.get(subscription_path + "ReferenceList")
         param_path = ref_param_list.split(",")[0]
-        periodic_interval = int(self._db.get(param_path + "PeriodicInterval"))
         periodic_handler = self._get_periodic_notif_handler(self._endpoint_id, controller_id,
-                                                            mtp_path, subscription_id,
-                                                            param_path, periodic_interval)
+                                                            mtp_path, subscription_id, param_path)
         if periodic_handler is not None:
             self._periodic_handler_list.append(periodic_handler)
             self._logger.info("Processed Periodic Subscription [%s] for MTP [%s] on Controller [%s]",
@@ -307,10 +293,83 @@ class AbstractAgent(object):
         raise NotImplementedError()
 
     def _get_periodic_notif_handler(self, agent_id, controller_id, mtp_path,
-                                    subscription_id, param_path, periodic_interval):
+                                    subscription_id, param_path):
         """Return an instance of a binding specific AbstractPeriodicNotifHandler"""
         raise NotImplementedError()
 
+
+
+class BindingListener(threading.Thread):
+    """Listen to a specific Binding for incoming Requests"""
+    def __init__(self, thread_name, binding, msg_handler, timeout=15):
+        """Initialize the STOMP Binding Listener"""
+        threading.Thread.__init__(self, name="StompBindingListener-" + thread_name)
+        self._binding = binding
+        self._timeout = timeout
+        self._msg_handler = msg_handler
+        self._logger = logging.getLogger(self.__class__.__name__)
+
+    def run(self):
+        """Start listening for messages and process them"""
+        # Listen for incoming messages
+        msg_payloads = self._receive_msgs()
+        for payload in msg_payloads:
+            if payload is not None:
+                self._handle_request(payload)
+
+
+    def _receive_msgs(self):
+        """Receive incoming messages from the binding"""
+        try:
+            while True:
+                payload = self._binding.get_msg(self._timeout)
+                yield payload
+        except GeneratorExit:
+            self._logger.info("STOMP Binding Listener is Shutting Down as requested...")
+
+    def _handle_request(self, payload):
+        """Handle a Request/Response interaction"""
+        resp = None
+
+        try:
+            req, resp, serialized_resp = self._msg_handler.handle_request(payload)
+
+            # Send the message either to the "from" or "reply-to" contained in the request
+            #  "reply-to" is optional and overrides the "from"
+            send_to = req.header.from_id
+            if len(req.header.reply_to_id) > 0:
+                send_to = req.header.reply_to_id
+
+            to_addr = self._get_addr_from_id(send_to)
+            if to_addr is not None:
+                self._log_messages(req, resp, to_addr)
+                self._binding.send_msg(serialized_resp, to_addr)
+            else:
+                self._logger.warning("Response not sent because an address could not be determined!")
+
+            #TODO: Check with the self._msg_handler if should shutdown, and raise a GeneratorExit
+        except request_handler.ProtocolViolationError:
+            # Error already logged in the USP Protocol Tool, nothing to do
+            self._logger.debug("USP Protocol Violation Encountered - dropping the Request")
+
+        return resp
+
+    def _log_messages(self, req, resp, to_addr):
+        """Logging Helper Static Method"""
+        self._logger.info("Handled a [%s] Request from Endpoint ID [%s]",
+                          req.body.request.WhichOneof("request"), req.header.from_id)
+
+        if resp.body.HasField("response"):
+            self._logger.info("Sending a [%s] Response to Endpoint Address [%s]",
+                              resp.body.response.WhichOneof("response"), to_addr)
+        elif resp.body.HasField("error"):
+            self._logger.info("Responding with an Error to Endpoint Address [%s]". to_addr)
+        else:
+            self._logger.warning("Sending an Unknown Response")
+
+    def _get_addr_from_id(self, to_endpoint_id):
+        """Binding Specific implementation of how to get an Endpoint Address from an Endpoint ID"""
+        raise NotImplementedError()
 
 
 class AbstractPeriodicNotifHandler(threading.Thread):
@@ -426,31 +485,16 @@ class AbstractValueChangeNotifPoller(threading.Thread):
 
 
 
-class AbstractNotificationSender(threading.Thread):
-    """An Abstract Notification Sender that is extended for a specific binding"""
-    def __init__(self, notif):
-        """Initialize the Abstract Notification Sender"""
-        threading.Thread.__init__(self, name="NotificationSender")
-        self._notif = notif
-        self._logger = logging.getLogger(self.__class__.__name__)
+class NotificationSender(threading.Thread):
+    """A Generic Notification Sender"""
+    def __init__(self, notif, binding, to_addr):
+        """Initialize the Notification Sender"""
+        self._binding = binding
+        self._to_addr = to_addr
+        self._msg = notif.generate_notif_msg()
+        threading.Thread.__init__(self, name="NotificationSender" + self._msg.body.request.notify.subscription_id)
 
 
     def run(self):
         """Thread execution code - send the Notification"""
-        msg = self._notif.generate_notif_msg()
-        self._prepare_binding()
-        self._send_notification(msg)
-        self._clean_up_binding()
-
-
-    def _prepare_binding(self):
-        """Perform actions needed to create a binding or prepare an existing binding to send a message"""
-        raise NotImplementedError()
-
-    def _send_notification(self, msg):
-        """Send the notification via the binding"""
-        raise NotImplementedError()
-
-    def _clean_up_binding(self):
-        """Perform actions needed to delete a binding or clean-up an existing binding that sent the message"""
-        raise NotImplementedError()
+        self._binding.send_msg(self._msg.SerializeToString(), self._to_addr)
