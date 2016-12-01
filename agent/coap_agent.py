@@ -73,7 +73,7 @@ class CoapAgent(abstract_agent.AbstractAgent):
         abstract_agent.AbstractAgent.start_listening(self)
 
         msg_handler = self.get_msg_handler()
-        listener = CoapBindingListener("CoAP", self._db,  self._binding, msg_handler, timeout)
+        listener = CoapBindingListener("CoAP", self._db, self._binding, msg_handler, timeout)
         listener.start()
         listener.join()
 
