@@ -116,14 +116,14 @@ class UspRequestHandler(object):
             # Validate that the Request body matches the Header's msg_type
             if req.body.request.WhichOneof("request") == "get":
                 resp = self._process_get(req)
-        elif req.header.msg_type == usp.Header.GET_INSTANCES:
-            # Validate that the Request body matches the Header's msg_type
-            if req.body.request.WhichOneof("request") == "get_instances":
-                resp = self._process_get_instances(req)
-        elif req.header.msg_type == usp.Header.GET_IMPL_OBJECTS:
-            # Validate that the Request body matches the Header's msg_type
-            if req.body.request.WhichOneof("request") == "get_impl_objects":
-                resp = self._process_get_impl_objects(req)
+#        elif req.header.msg_type == usp.Header.GET_INSTANCES:
+#            # Validate that the Request body matches the Header's msg_type
+#            if req.body.request.WhichOneof("request") == "get_instances":
+#                resp = self._process_get_instances(req)
+#        elif req.header.msg_type == usp.Header.GET_IMPL_OBJECTS:
+#            # Validate that the Request body matches the Header's msg_type
+#            if req.body.request.WhichOneof("request") == "get_impl_objects":
+#                resp = self._process_get_impl_objects(req)
         elif req.header.msg_type == usp.Header.SET:
             # Validate that the Request body matches the Header's msg_type
             if req.body.request.WhichOneof("request") == "set":
@@ -175,6 +175,9 @@ class UspRequestHandler(object):
 
     def _process_get_instances(self, req):
         """Process an incoming GetInstances and generate a GetInstancesResp"""
+        # TODO: Dead Code - GetInstances was removed in favor of GetObjects
+        pass
+        """
         resp = usp.Msg()
         path_result_list = []
         self._logger.info("Processing a GetInstances Request...")
@@ -199,9 +202,13 @@ class UspRequestHandler(object):
         resp.body.response.get_instances_resp.req_path_result.extend(path_result_list)
 
         return resp
+        """
 
     def _process_get_impl_objects(self, req):
         """Process an incoming GetImplObjects and generate a GetImplObjectsResp"""
+        # TODO: Dead Code - GetImplObjects was removed in favor of GetObjects
+        pass
+        """
         resp = usp.Msg()
         path_result_list = []
         self._logger.info("Processing a GetImplObjects Request...")
@@ -228,6 +235,7 @@ class UspRequestHandler(object):
         resp.body.response.get_impl_objects_resp.req_path_result.extend(path_result_list)
 
         return resp
+        """
 
     def _process_set(self, req):
         """Process an incoming Set and generate a SetResp"""
@@ -264,7 +272,6 @@ class UspRequestHandler(object):
 
         # Loop through each UpdateObject
         for obj_to_update in req.body.request.set.update_obj:
-            param_err_list = []
             update_inst_result_list = []
             obj_path_set_failure_err_dict = {}
             obj_path_to_update = obj_to_update.obj_path
@@ -274,11 +281,9 @@ class UspRequestHandler(object):
 
                 # For each Affected Path, update the Parameter Settings
                 for affected_path in affected_path_list:
-                    update_inst_result = usp.SetResp.UpdatedInstanceResult()
-                    update_inst_result.affected_path = affected_path
+                    set_failure_err_dict, update_inst_result = \
+                        self._validate_set_params(affected_path, obj_to_update, path_to_set_dict)
 
-                    set_failure_err_dict = self._validate_set_params(affected_path, obj_to_update, path_to_set_dict,
-                                                                     update_inst_result, param_err_list)
                     if len(set_failure_err_dict) > 0:
                         obj_path_set_failure_err_dict[affected_path] = set_failure_err_dict
 
@@ -288,7 +293,6 @@ class UspRequestHandler(object):
                     # If there were no Set Failure errors for the obj_to_update, oper_success
                     update_obj_result = usp.SetResp.UpdatedObjectResult()
                     update_obj_result.requested_path = obj_path_to_update
-                    update_obj_result.oper_status.oper_success.param_err.extend(param_err_list)
                     update_obj_result.oper_status.oper_success.updated_inst_result.extend(update_inst_result_list)
                     update_obj_result_list.append(update_obj_result)
                 else:
@@ -360,9 +364,12 @@ class UspRequestHandler(object):
         """
         raise SetValidationError(9000, "Auto Creation for Set is only applicable for unique-key based addressing")
 
-    def _validate_set_params(self, affected_path, obj_to_update, path_to_set_dict, update_inst_result, param_err_list):
+    def _validate_set_params(self, affected_path, obj_to_update, path_to_set_dict):
         """Validate the parameters related to the affected path"""
+        param_err_list = []
         set_failure_err_dict = {}
+        update_inst_result = usp.SetResp.UpdatedInstanceResult()
+        update_inst_result.affected_path = affected_path
 
         # Loop through each parameter to validate it
         for param_to_update in obj_to_update.param_setting:
@@ -393,13 +400,14 @@ class UspRequestHandler(object):
                     set_failure_err_dict[param_to_update.param] = err_msg
                 else:
                     param_err = usp.SetResp.ParameterError()
-                    param_err.param_path = param_path
-                    param_err.param_value = value_to_set
+                    param_err.param = param_to_update.param
                     param_err.err_code = 9000
                     param_err.err_msg = err_msg
                     param_err_list.append(param_err)
 
-        return set_failure_err_dict
+        update_inst_result.param_err.extend(param_err_list)
+
+        return set_failure_err_dict, update_inst_result
 
     def _handle_set_param_errors(self, obj_path_to_update, allow_partial_updates, obj_path_set_failure_err_dict,
                                  update_obj_result_list, set_failure_param_err_list):
