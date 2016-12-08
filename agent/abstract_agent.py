@@ -249,8 +249,8 @@ class AbstractAgent(object):
 
     def _handle_periodic(self, subscription_path, controller_id, mtp_path, subscription_id):
         """Handle a Subscription for a Periodic Notification"""
-        ref_param_list = self._db.get(subscription_path + "ReferenceList")
-        param_path = ref_param_list.split(",")[0]
+        # Pull the path from the Recipient instead of ReferenceList as we need the Controller path
+        param_path = self._db.get(subscription_path + "Recipient")
         periodic_handler = self._get_periodic_notif_handler(self._endpoint_id, controller_id,
                                                             mtp_path, subscription_id, param_path)
         if periodic_handler is not None:
