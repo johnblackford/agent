@@ -39,6 +39,7 @@
 """
 
 
+from agent import mdns
 from agent import utils
 from agent import notify
 from agent import abstract_agent
@@ -53,13 +54,18 @@ class CoapAgent(abstract_agent.AbstractAgent):
         abstract_agent.AbstractAgent.__init__(self, dm_file, db_file, cfg_file_name)
 
         # Initialize the underlying Agent DB MTP details for CoAP
-        url = "coap://" + utils.IPAddr.get_ip_addr() + ":" + str(port) + "/usp"
+        resource_path = 'usp'
+        ip_addr = utils.IPAddr.get_ip_addr()
+        url = "coap://" + ip_addr + ":" + str(port) + "/" + resource_path
         self._db.update("Device.LocalAgent.MTP.1.Enable", True)   # Enable the CoAP MTP
         self._db.update("Device.LocalAgent.MTP.1.CoAP.URL", url)  # Set the CoAP MTP URL
         self._db.update("Device.LocalAgent.MTP.2.Enable", False)  # Disable the STOMP MTP
 
-        self._binding = coap_usp_binding.CoapUspBinding(port, debug=debug)
+        self._binding = coap_usp_binding.CoapUspBinding(port, resource_path=resource_path, debug=debug)
         self._binding.listen(self._endpoint_id)
+
+        self._mdns_announcer = mdns.Announcer(ip_addr, port, resource_path, self._endpoint_id)
+        self._mdns_announcer.announce()
 
         value_change_notif_poller = CoapValueChangeNotifPoller(self._db)
         value_change_notif_poller.set_binding(self._binding)

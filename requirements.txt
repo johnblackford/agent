@@ -2,8 +2,11 @@ aiocoap==0.2
 bottle==0.12.9
 cov-core==1.15.0
 coverage==4.2
+enum-compat==0.0.2
+netifaces==0.10.5
 nose2==0.6.5
 nose2-cov==1.0a4
 py3-protobuffers==3.0.0a4
 six==1.10.0
 stomp.py==4.1.11
+zeroconf==0.17.6
