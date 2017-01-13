@@ -5,6 +5,8 @@
     "Device.DeviceInfo.SerialNumber": "T0000000001",
     "Device.DeviceInfo.ModelName": "PoC-USP-Agent-Test",
     "Device.LocalAgent.EndpointID": "00D09E-RPi_Test-T0000000001",
+	"Device.DeviceInfo.FriendlyName": "dummy",
+	"Device.LocalAgent.AdvertisedDeviceSubtypes": "test",
     "Device.LocalAgent.HardwareVersion": "RPi2-B",
     "Device.LocalAgent.SoftwareVersion": "0.0.1-alpha",
     "Device.LocalAgent.SupportedProtocols": "CoAP, STOMP",

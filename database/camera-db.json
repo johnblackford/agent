@@ -5,6 +5,8 @@
     "Device.DeviceInfo.SerialNumber": "C0000000001",
     "Device.DeviceInfo.ModelName": "PoC-USP-Agent-Camera",
     "Device.LocalAgent.EndpointID": "00D09E-RPi_Camera-C0000000001",
+	"Device.DeviceInfo.FriendlyName": "spy",
+	"Device.LocalAgent.AdvertisedDeviceSubtypes": "camera",
     "Device.LocalAgent.HardwareVersion": "RPi2-B",
     "Device.LocalAgent.SoftwareVersion": "0.0.1-alpha",
     "Device.LocalAgent.SupportedProtocols": "CoAP, STOMP",

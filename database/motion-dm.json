@@ -6,6 +6,8 @@
 	"Device.DeviceInfo.ModelName": "readOnly",
 	"Device.DeviceInfo.HardwareVersion": "readOnly",
 	"Device.LocalAgent.EndpointID": "readOnly",
+	"Device.DeviceInfo.FriendlyName": "readOnly",
+	"Device.LocalAgent.AdvertisedDeviceSubtypes": "readOnly",
 	"Device.LocalAgent.SoftwareVersion": "readOnly",
 	"Device.LocalAgent.SupportedProtocols": "readOnly",
 	"Device.LocalAgent.UpTime": "readOnly",

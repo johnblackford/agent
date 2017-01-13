@@ -5,6 +5,8 @@
     "Device.DeviceInfo.SerialNumber": "M0000000001",
     "Device.DeviceInfo.ModelName": "PoC-USP-Agent-Motion",
     "Device.LocalAgent.EndpointID": "00D09E-RPi_Motion-M0000000001",
+	"Device.DeviceInfo.FriendlyName": "snitch",
+	"Device.LocalAgent.AdvertisedDeviceSubtypes": "sensor",
     "Device.LocalAgent.HardwareVersion": "RPi2-B",
     "Device.LocalAgent.SoftwareVersion": "0.0.1-alpha",
     "Device.LocalAgent.SupportedProtocols": "CoAP, STOMP",

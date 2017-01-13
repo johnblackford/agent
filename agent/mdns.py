@@ -49,7 +49,7 @@ class Announcer(object):
         self._domain = "local."
 
 
-    def announce(self):
+    def announce(self, friendly_name=None, subtypes=None):
         """Announce myself on mDNS by registering a service"""
         svc_type = self._service + self._domain
         svc_name = self._instance + "." + self._service + self._domain
@@ -57,6 +57,12 @@ class Announcer(object):
         svc_port = self._port
         svc_server = self._instance + "." + self._domain
         svc_props = {"path": self._resource_path}
+
+        if friendly_name is not None:
+            svc_props["name"] = friendly_name
+
+        if subtypes is not None:
+            svc_props["type"] = subtypes
 
         srv = zeroconf.ServiceInfo(svc_type, svc_name, svc_addr, svc_port, properties=svc_props, server=svc_server)
         self._zconf = zeroconf.Zeroconf(interfaces=zeroconf.InterfaceChoice.Default)

@@ -42,6 +42,7 @@
 from agent import mdns
 from agent import utils
 from agent import notify
+from agent import agent_db
 from agent import abstract_agent
 from agent import coap_usp_binding
 
@@ -65,7 +66,7 @@ class CoapAgent(abstract_agent.AbstractAgent):
         self._binding.listen(self._endpoint_id)
 
         self._mdns_announcer = mdns.Announcer(ip_addr, port, resource_path, self._endpoint_id)
-        self._mdns_announcer.announce()
+        self._mdns_announcer.announce(self._get_friendly_name(), self._get_subtypes())
 
         value_change_notif_poller = CoapValueChangeNotifPoller(self._db)
         value_change_notif_poller.set_binding(self._binding)
@@ -105,6 +106,28 @@ class CoapAgent(abstract_agent.AbstractAgent):
                                                           subscription_id, param_path, controller_url)
         periodic_notif_handler.set_binding(self._binding)
         return periodic_notif_handler
+
+    def _get_friendly_name(self):
+        """Retrieve the Friendly Name of the Agent for use in mDNS advertising"""
+        friendly_name = None
+
+        try:
+            friendly_name = self._db.get("Device.DeviceInfo.FriendlyName")
+        except agent_db.NoSuchPathError:
+            self._logger.warning("Can't retrieve 'Friendly Name' for mDNS advertising")
+
+        return friendly_name
+
+    def _get_subtypes(self):
+        """Retrieve the Device Advertised Subtypes of the Agent for use in mDNS advertising"""
+        subtypes = None
+
+        try:
+            subtypes = self._db.get("Device.LocalAgent.AdvertisedDeviceSubtypes")
+        except agent_db.NoSuchPathError:
+            self._logger.warning("Can't retrieve 'Advertised Device Subtypes' for mDNS advertising")
+
+        return subtypes
 
 
 
