@@ -213,9 +213,9 @@ class CoapPeriodicNotifHandler(abstract_agent.AbstractPeriodicNotifHandler):
 
 class CoapValueChangeNotifPoller(abstract_agent.AbstractValueChangeNotifPoller):
     """Poll Parameters for Value Change Notifications via a CoAP Binding"""
-    def __init__(self, agent_db, poll_duration=0.5):
+    def __init__(self, agent_database, poll_duration=0.5):
         """Initialize the STOMP Value Change Notification Poller"""
-        abstract_agent.AbstractValueChangeNotifPoller.__init__(self, agent_db, poll_duration)
+        abstract_agent.AbstractValueChangeNotifPoller.__init__(self, agent_database, poll_duration)
         self._binding = None
 
 
