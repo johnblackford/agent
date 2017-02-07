@@ -281,11 +281,11 @@ class UspRequestHandler(object):
 
                 # For each Affected Path, update the Parameter Settings
                 for affected_path in affected_path_list:
-                    set_failure_err_dict, update_inst_result = \
+                    set_failure_err_list, update_inst_result = \
                         self._validate_set_params(affected_path, obj_to_update, path_to_set_dict)
 
-                    if len(set_failure_err_dict) > 0:
-                        obj_path_set_failure_err_dict[affected_path] = set_failure_err_dict
+                    if len(set_failure_err_list) > 0:
+                        obj_path_set_failure_err_dict[affected_path] = set_failure_err_list
 
                     update_inst_result_list.append(update_inst_result)
 
@@ -367,7 +367,7 @@ class UspRequestHandler(object):
     def _validate_set_params(self, affected_path, obj_to_update, path_to_set_dict):
         """Validate the parameters related to the affected path"""
         param_err_list = []
-        set_failure_err_dict = {}
+        set_failure_err_list = []
         update_inst_result = usp.SetResp.UpdatedInstanceResult()
         update_inst_result.affected_path = affected_path
 
@@ -387,7 +387,7 @@ class UspRequestHandler(object):
                     else:
                         self._logger.info("Ignoring %s: same value as current", param_path)
 
-                    update_inst_result.result_param_map[param_to_update.param] = value_to_set
+                    update_inst_result.updated_param_map[param_to_update.param] = value_to_set
                 else:
                     param_failure = True
                     err_msg = "Parameter is not writable"
@@ -396,18 +396,19 @@ class UspRequestHandler(object):
                 err_msg = "Parameter does not exist"
 
             if param_failure:
+                param_err = usp.SetResp.ParameterError()
+                param_err.param = param_to_update.param
+                param_err.err_code = 9000
+                param_err.err_msg = err_msg
+
                 if param_to_update.required:
-                    set_failure_err_dict[param_to_update.param] = err_msg
+                    set_failure_err_list.append(param_err)
                 else:
-                    param_err = usp.SetResp.ParameterError()
-                    param_err.param = param_to_update.param
-                    param_err.err_code = 9000
-                    param_err.err_msg = err_msg
                     param_err_list.append(param_err)
 
         update_inst_result.param_err.extend(param_err_list)
 
-        return set_failure_err_dict, update_inst_result
+        return set_failure_err_list, update_inst_result
 
     def _handle_set_param_errors(self, obj_path_to_update, allow_partial_updates, obj_path_set_failure_err_dict,
                                  update_obj_result_list, set_failure_param_err_list):
@@ -415,17 +416,26 @@ class UspRequestHandler(object):
         # If there were Set Failure errors for the obj_to_update
         if allow_partial_updates:
             # Set Failures are handled via oper_failure on the SetResp
-            err_msg = "Failed to Set Required Parameters: "
-
-            for affected_path in obj_path_set_failure_err_dict:
-                for param_name in obj_path_set_failure_err_dict[affected_path]:
-                    err_msg = err_msg + affected_path + param_name + "(" + \
-                              obj_path_set_failure_err_dict[affected_path][param_name] + ") "
+            failure_list = []
+            param_err_list = []
+            err_msg = "Failed to Set Required Parameters"
 
             update_obj_result = usp.SetResp.UpdatedObjectResult()
             update_obj_result.requested_path = obj_path_to_update
             update_obj_result.oper_status.oper_failure.err_code = 9000
             update_obj_result.oper_status.oper_failure.err_msg = err_msg
+
+            for affected_path in obj_path_set_failure_err_dict:
+                failure = usp.SetResp.UpdatedInstanceFailure()
+                failure.affected_path = affected_path
+
+                for param_err in obj_path_set_failure_err_dict[affected_path]:
+                    param_err_list.append(param_err)
+
+                failure.param_err.extend(param_err_list)
+                failure_list.append(failure)
+
+            update_obj_result.oper_status.oper_failure.updated_inst_failure.extend(failure_list)
             update_obj_result_list.append(update_obj_result)
         else:
             # Set Failures are handled via ParamError on an Error message
