@@ -303,7 +303,7 @@ class BindingListener(threading.Thread):
     """Listen to a specific Binding for incoming Requests"""
     def __init__(self, thread_name, binding, msg_handler, timeout=15):
         """Initialize the STOMP Binding Listener"""
-        threading.Thread.__init__(self, name="StompBindingListener-" + thread_name)
+        threading.Thread.__init__(self, name="BindingListener-" + thread_name)
         self._binding = binding
         self._timeout = timeout
         self._msg_handler = msg_handler
