@@ -9,4 +9,4 @@ nose2-cov==1.0a4
 py3-protobuffers==3.0.0a4
 six==1.10.0
 stomp.py==4.1.11
-zeroconf==0.17.6
+zeroconf==0.18.0
