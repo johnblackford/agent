@@ -1,4 +1,4 @@
-# Copyright (c) 2016 John Blackford
+# Copyright (c) 2016-2017 John Blackford
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -50,13 +50,13 @@ from agent import coap_usp_binding
 
 class CoapAgent(abstract_agent.AbstractAgent):
     """A USP Agent that uses the CoAP Binding"""
-    def __init__(self, dm_file, db_file, port=5683, cfg_file_name="cfg/agent.json", debug=False):
+    def __init__(self, dm_file, db_file, net_intf, port=5683, cfg_file_name="cfg/agent.json", debug=False):
         """Initialize the CoAP Agent"""
         abstract_agent.AbstractAgent.__init__(self, dm_file, db_file, cfg_file_name)
 
         # Initialize the underlying Agent DB MTP details for CoAP
         resource_path = 'usp'
-        ip_addr = utils.IPAddr.get_ip_addr()
+        ip_addr = self._get_ip_addr(net_intf)
         url = "coap://" + ip_addr + ":" + str(port) + "/" + resource_path
         self._db.update("Device.LocalAgent.MTP.1.Enable", True)   # Enable the CoAP MTP
         self._db.update("Device.LocalAgent.MTP.1.CoAP.URL", url)  # Set the CoAP MTP URL
@@ -88,6 +88,15 @@ class CoapAgent(abstract_agent.AbstractAgent):
         """Clean up the USP Binding"""
         self._binding.clean_up()
 
+
+    def _get_ip_addr(self, net_intf):
+        """Get the IP Address for this Agent"""
+        if len(net_intf) > 1:
+            ip_addr = utils.IPAddr.get_ip_addr(net_intf)
+        else:
+            ip_addr = utils.IPAddr.get_ip_addr()
+
+        return ip_addr
 
     def _get_supported_protocol(self):
         """Return the supported Protocol as a String: CoAP, STOMP, HTTP/2, WebSockets"""

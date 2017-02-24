@@ -54,6 +54,9 @@ class Agent(object):
         parser.add_argument("--coap-port", action="store", nargs="?",
                             type=int, default=5683,
                             help="specify the CoAP Port to listen on")
+        parser.add_argument("--intf", action="store", nargs="?",
+                            type=str, default="",
+                            help="specify the network interface to use")
         parser.add_argument("-t", "--client-type", action="store", nargs="?",
                             default="test",
                             help="specify the type of client (e.g. test, camera, motion)")
@@ -64,6 +67,7 @@ class Agent(object):
         client_type = args.client_type
         use_coap = args.coap
         coap_port = args.coap_port
+        net_intf = args.intf
 
         dm_file_name = "database/{}-dm.json".format(client_type)
         db_file_name = "database/{}.db".format(client_type)
@@ -73,7 +77,7 @@ class Agent(object):
             logging.info("## Starting a CoAP USP Agent                         ##")
             logging.info("#######################################################")
 
-            my_coap_agent = coap_agent.CoapAgent(dm_file_name, db_file_name, coap_port, cfg_file_name, debug)
+            my_coap_agent = coap_agent.CoapAgent(dm_file_name, db_file_name, net_intf, coap_port, cfg_file_name, debug)
             my_coap_agent.start_listening()
             my_coap_agent.clean_up()
         else:
