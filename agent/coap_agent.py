@@ -53,36 +53,42 @@ class CoapAgent(abstract_agent.AbstractAgent):
     def __init__(self, dm_file, db_file, net_intf, port=5683, cfg_file_name="cfg/agent.json", debug=False):
         """Initialize the CoAP Agent"""
         abstract_agent.AbstractAgent.__init__(self, dm_file, db_file, cfg_file_name)
+        self._can_start = True
 
         # Initialize the underlying Agent DB MTP details for CoAP
         resource_path = 'usp'
         ip_addr = self._get_ip_addr(net_intf)
-        url = "coap://" + ip_addr + ":" + str(port) + "/" + resource_path
-        self._db.update("Device.LocalAgent.MTP.1.Enable", True)   # Enable the CoAP MTP
-        self._db.update("Device.LocalAgent.MTP.1.CoAP.URL", url)  # Set the CoAP MTP URL
-        self._db.update("Device.LocalAgent.MTP.2.Enable", False)  # Disable the STOMP MTP
+        if ip_addr is not None:
+            url = "coap://" + ip_addr + ":" + str(port) + "/" + resource_path
+            self._db.update("Device.LocalAgent.MTP.1.Enable", True)   # Enable the CoAP MTP
+            self._db.update("Device.LocalAgent.MTP.1.CoAP.URL", url)  # Set the CoAP MTP URL
+            self._db.update("Device.LocalAgent.MTP.2.Enable", False)  # Disable the STOMP MTP
 
-        self._binding = coap_usp_binding.CoapUspBinding(port, resource_path=resource_path, debug=debug)
-        self._binding.listen(self._endpoint_id)
+            self._binding = coap_usp_binding.CoapUspBinding(port, resource_path=resource_path, debug=debug)
+            self._binding.listen(self._endpoint_id)
 
-        self._mdns_announcer = mdns.Announcer(ip_addr, port, resource_path, self._endpoint_id)
-        self._mdns_announcer.announce(self._get_friendly_name(), self._get_subtypes())
+            self._mdns_announcer = mdns.Announcer(ip_addr, port, resource_path, self._endpoint_id)
+            self._mdns_announcer.announce(self._get_friendly_name(), self._get_subtypes())
 
-        value_change_notif_poller = CoapValueChangeNotifPoller(self._db)
-        value_change_notif_poller.set_binding(self._binding)
-        self.set_value_change_notif_poller(value_change_notif_poller)
+            value_change_notif_poller = CoapValueChangeNotifPoller(self._db)
+            value_change_notif_poller.set_binding(self._binding)
+            self.set_value_change_notif_poller(value_change_notif_poller)
 
-        self.init_subscriptions()
+            self.init_subscriptions()
+        else:
+            self._can_start = False
+            self._logger.error("IP Address could not be found for provided Network Interface - EXITING")
 
 
     def start_listening(self, timeout=15):
         """Start listening for messages and process them"""
-        abstract_agent.AbstractAgent.start_listening(self)
+        if self._can_start:
+            abstract_agent.AbstractAgent.start_listening(self)
 
-        msg_handler = self.get_msg_handler()
-        listener = CoapBindingListener("CoAP", self._db, self._binding, msg_handler, timeout)
-        listener.start()
-        listener.join()
+            msg_handler = self.get_msg_handler()
+            listener = CoapBindingListener("CoAP", self._db, self._binding, msg_handler, timeout)
+            listener.start()
+            listener.join()
 
     def clean_up(self):
         """Clean up the USP Binding"""
