@@ -1,5 +1,5 @@
 """
-Copyright (c) 2016 John Blackford
+Copyright (c) 2016-2017 John Blackford
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -147,21 +147,26 @@ class IPAddr:
     @staticmethod
     def _get_rpi_ip_address(netdev='eth0'):
         """Retrieve the IP Address on Raspberry Pi"""
-        arg = 'ip addr show ' + netdev
-        proc = subprocess.Popen(arg, shell=True, stdout=subprocess.PIPE)
-        data = proc.communicate()
-        sdata = data[0].decode("utf-8").split('\n')
-        ipaddr = sdata[2].strip().split(' ')[1].split('/')[0]
-        return ipaddr
+        cmd = 'ip addr show ' + netdev
+        return IPAddr._get_ipv4_address(cmd)
 
     @staticmethod
     def _get_mac_ip_address(netdev='en0'):
         """Retrieve the IP Address on Mac OS X"""
-        arg = 'ifconfig ' + netdev
-        proc = subprocess.Popen(arg, shell=True, stdout=subprocess.PIPE)
+        cmd = 'ifconfig ' + netdev
+        return IPAddr._get_ipv4_address(cmd)
+
+    @staticmethod
+    def _get_ipv4_address(command):
+        """Retrieve the first IPv4 Address based on the provided RPi/MacOS command"""
+        ipaddr = None
+        proc = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE)
         data = proc.communicate()
         sdata = data[0].decode("utf-8").split('\n')
-        ipaddr = sdata[3].strip().split(' ')[1].split('/')[0]
+        for line in sdata:
+            if line.strip().startswith("inet "):
+                # Retrieve an IPv4 address (ignore IPv6 addresses)
+                ipaddr = line.strip().split(' ')[1].split('/')[0]
         return ipaddr
 
 
