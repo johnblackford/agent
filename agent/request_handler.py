@@ -165,7 +165,8 @@ class UspRequestHandler(object):
                     path_result.result_param_map[req_path] = str(self._db.get(req_path))
             except agent_db.NoSuchPathError:
                 self._logger.warning("Invalid Path encountered: %s", req_path)
-                path_result.invalid_path = True
+                path_result.err_code = 11002
+                path_result.err_msg = "Invalid Path: " + req_path + " is not a part of the supported data model"
 
             path_result_list.append(path_result)
 
@@ -277,7 +278,7 @@ class UspRequestHandler(object):
             obj_path_to_update = obj_to_update.obj_path
 
             try:
-                affected_path_list = self._get_affected_paths(obj_path_to_update, obj_to_update.auto_create)
+                affected_path_list = self._get_affected_paths(obj_path_to_update)
 
                 # For each Affected Path, update the Parameter Settings
                 for affected_path in affected_path_list:
@@ -303,11 +304,10 @@ class UspRequestHandler(object):
                 self._handle_set_validation_err(obj_path_to_update, allow_partial_updates,
                                                 sv_err, update_obj_result_list, set_failure_param_err_list)
 
-    def _get_affected_paths(self, obj_path_to_update, auto_create_obj):
+    def _get_affected_paths(self, obj_path_to_update):
         """
           Retrieve the affected paths based on the incoming obj_path:
             - Retrieve existing Paths (including general validation and that it is supported)
-              - If no Paths exist then consider the auto_create flag :: SetValidationError raised if anything fails
         """
         is_static_path = self._is_set_path_static(obj_path_to_update)
         is_search_path = self._is_set_path_searching(obj_path_to_update)
@@ -316,15 +316,11 @@ class UspRequestHandler(object):
             affected_path_list = self._db.find_objects(obj_path_to_update)
 
             if len(affected_path_list) == 0:
-                if auto_create_obj:
-                    if is_search_path or is_static_path:
-                        pass
-                    else:
-                        # The obj_path doesn't exist, but auto_create is enabled so create the instance
-                        affected_path_list = self._auto_create_set_path(obj_path_to_update)
+                if is_search_path or is_static_path:
+                    pass
                 else:
                     err_code = 9000
-                    err_msg = "Non-existent obj_path encountered (auto_create disabled)- {}".format(obj_path_to_update)
+                    err_msg = "Non-existent obj_path encountered - {}".format(obj_path_to_update)
                     raise SetValidationError(err_code, err_msg)
         except agent_db.NoSuchPathError:
             err_code = 9000
@@ -355,14 +351,6 @@ class UspRequestHandler(object):
             - FUTURE: expression-based searching elements
         """
         return ".*." in obj_path_to_update
-
-    def _auto_create_set_path(self, obj_path_to_update):
-        """
-          Automatically Create the obj_path_to_update with the supplied inst_ident:
-            - Unless the inst_ident is an instance number, then create with next instance number
-            - Return the path that was created in a list
-        """
-        raise SetValidationError(9000, "Auto Creation for Set is only applicable for unique-key based addressing")
 
     def _validate_set_params(self, affected_path, obj_to_update, path_to_set_dict):
         """Validate the parameters related to the affected path"""
