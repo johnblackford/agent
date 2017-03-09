@@ -357,11 +357,11 @@ class BindingListener(threading.Thread):
     def _log_messages(self, req, resp, to_addr):
         """Logging Helper Static Method"""
         self._logger.info("Handled a [%s] Request from Endpoint ID [%s]",
-                          req.body.request.WhichOneof("request"), req.header.from_id)
+                          req.body.request.WhichOneof("req_type"), req.header.from_id)
 
         if resp.body.HasField("response"):
             self._logger.info("Sending a [%s] Response to Endpoint Address [%s]",
-                              resp.body.response.WhichOneof("response"), to_addr)
+                              resp.body.response.WhichOneof("resp_type"), to_addr)
         elif resp.body.HasField("error"):
             self._logger.info("Responding with an Error to Endpoint Address [%s]". to_addr)
         else:

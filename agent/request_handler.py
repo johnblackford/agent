@@ -69,7 +69,7 @@ class UspRequestHandler(object):
             # Validate the payload before processing it
             self._validate_request(req)
             self._logger.info("Received a [%s] Request",
-                              req.body.request.WhichOneof("request"))
+                              req.body.request.WhichOneof("req_type"))
 
             resp = self._process_request(req)
         except ProtocolValidationError as err:
@@ -114,23 +114,23 @@ class UspRequestHandler(object):
 
         if req.header.msg_type == usp.Header.GET:
             # Validate that the Request body matches the Header's msg_type
-            if req.body.request.WhichOneof("request") == "get":
+            if req.body.request.WhichOneof("req_type") == "get":
                 resp = self._process_get(req)
 #        elif req.header.msg_type == usp.Header.GET_INSTANCES:
 #            # Validate that the Request body matches the Header's msg_type
-#            if req.body.request.WhichOneof("request") == "get_instances":
+#            if req.body.request.WhichOneof("req_type") == "get_instances":
 #                resp = self._process_get_instances(req)
 #        elif req.header.msg_type == usp.Header.GET_IMPL_OBJECTS:
 #            # Validate that the Request body matches the Header's msg_type
-#            if req.body.request.WhichOneof("request") == "get_impl_objects":
+#            if req.body.request.WhichOneof("req_type") == "get_impl_objects":
 #                resp = self._process_get_impl_objects(req)
         elif req.header.msg_type == usp.Header.SET:
             # Validate that the Request body matches the Header's msg_type
-            if req.body.request.WhichOneof("request") == "set":
+            if req.body.request.WhichOneof("req_type") == "set":
                 resp = self._process_set(req)
         elif req.header.msg_type == usp.Header.OPERATE:
             # Validate that the Request body matches the Header's msg_type
-            if req.body.request.WhichOneof("request") == "operate":
+            if req.body.request.WhichOneof("req_type") == "operate":
                 resp = self._process_operation(req)
         else:
             err_msg = "Invalid USP Message: unknown command"
