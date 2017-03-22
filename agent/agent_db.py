@@ -52,8 +52,9 @@ from agent import utils
 
 class Database(object):
     """Represents a simple database"""
-    def __init__(self, dm_filename, db_filename):
+    def __init__(self, dm_filename, db_filename, net_intf):
         """Initialize the DB from a file"""
+        self._net_intf = net_intf
         self._db_filename = db_filename
         self._file_write_lock = threading.Lock()
         self._new_inst_num_lock = threading.Lock()
@@ -91,7 +92,7 @@ class Database(object):
             if self._db[path] == "__UPTIME__":
                 return int(time.time() - self._start_time)
             elif self._db[path] == "__IPADDR__":
-                return utils.IPAddr.get_ip_addr()
+                return utils.IPAddr.get_ip_addr(self._net_intf)
             elif self._db[path] == "__CURR_TIME__":
                 time_zone = self._db["Device.Time.LocalTimeZone"]
                 tz_part = time_zone.split(",")[0]
