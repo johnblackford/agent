@@ -36,6 +36,7 @@ SOFTWARE.
 #
 """
 
+import logging
 
 from agent import utils
 from agent import usp_pb2 as usp
@@ -49,6 +50,7 @@ class Notification(object):
         self._to_id = to_id
         self._from_id = from_id
         self._subscription_id = subscription_id
+        self._logger = logging.getLogger(self.__class__.__name__)
 
 
     def generate_notif_msg(self):
@@ -90,7 +92,12 @@ class BootNotification(Notification):
         notif.body.request.notify.boot.obj_ref = "Device.LocalAgent."
 
         for path in boot_param_list:
-            notif.body.request.notify.boot.param_map[path] = self._db.get(path)
+            value = self._db.get(path)
+            if value is not None:
+                notif.body.request.notify.boot.param_map[path] = value
+            else:
+                self._logger.warning("Boot Param [%s] is None", path)
+                notif.body.request.notify.boot.param_map[path] = ""
 
         return notif
 
