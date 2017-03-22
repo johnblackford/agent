@@ -76,7 +76,7 @@ CAMERA_IMAGE_DIR = "camera.image.dir"
 
 class AbstractAgent(object):
     """An Abstract USP Agent that can be built upon for a specific binding"""
-    def __init__(self, dm_file, db_file, cfg_file_name):
+    def __init__(self, dm_file, db_file, net_intf, cfg_file_name):
         """Initialize the Abstract Agent"""
         self._service_map = {}
         self._periodic_handler_list = []
@@ -85,7 +85,7 @@ class AbstractAgent(object):
         self._value_change_notif_poller = None
         self._logger = logging.getLogger(self.__class__.__name__)
 
-        self._db = agent_db.Database(dm_file, db_file)
+        self._db = agent_db.Database(dm_file, db_file, net_intf)
         self._endpoint_id = self._db.get("Device.LocalAgent.EndpointID")
 
         self._load_services()
