@@ -52,7 +52,7 @@ class CoapAgent(abstract_agent.AbstractAgent):
     """A USP Agent that uses the CoAP Binding"""
     def __init__(self, dm_file, db_file, net_intf, port=5683, cfg_file_name="cfg/agent.json", debug=False):
         """Initialize the CoAP Agent"""
-        abstract_agent.AbstractAgent.__init__(self, dm_file, db_file, cfg_file_name)
+        abstract_agent.AbstractAgent.__init__(self, dm_file, db_file, net_intf, cfg_file_name)
         self._can_start = True
 
         # Initialize the underlying Agent DB MTP details for CoAP
@@ -63,6 +63,7 @@ class CoapAgent(abstract_agent.AbstractAgent):
             self._db.update("Device.LocalAgent.MTP.1.Enable", True)   # Enable the CoAP MTP
             self._db.update("Device.LocalAgent.MTP.1.CoAP.URL", url)  # Set the CoAP MTP URL
             self._db.update("Device.LocalAgent.MTP.2.Enable", False)  # Disable the STOMP MTP
+            self._logger.info("Listening at URL: %s", url)
 
             self._binding = coap_usp_binding.CoapUspBinding(port, resource_path=resource_path, debug=debug)
             self._binding.listen(self._endpoint_id)
@@ -77,7 +78,8 @@ class CoapAgent(abstract_agent.AbstractAgent):
             self.init_subscriptions()
         else:
             self._can_start = False
-            self._logger.error("IP Address could not be found for provided Network Interface - EXITING")
+            self._logger.error("IP Address could not be found for provided Network Interface [%s] - EXITING",
+                               net_intf)
 
 
     def start_listening(self, timeout=15):
@@ -92,7 +94,8 @@ class CoapAgent(abstract_agent.AbstractAgent):
 
     def clean_up(self):
         """Clean up the USP Binding"""
-        self._binding.clean_up()
+        if self._can_start:
+            self._binding.clean_up()
 
 
     def _get_ip_addr(self, net_intf):
