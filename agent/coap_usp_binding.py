@@ -230,7 +230,7 @@ class CoapUspBinding(generic_usp_binding.GenericUspBinding):
         coap_send_thr.start()
         coap_send_thr.join(self._sending_thr_timeout)
 
-    def listen(self, endpoint_id):
+    def listen(self, endpoint_id, agent_addr):
         """Listen for incoming CoAP messages"""
         # Agent Initialization - Create a Server Resource Tree for the USP Agent
         self._logger.debug("Creating a CoAP Server Resource Tree for USP Endpoint: %s", endpoint_id)
@@ -241,6 +241,7 @@ class CoapUspBinding(generic_usp_binding.GenericUspBinding):
 
         # An Endpoint needs a Server Context for the Resource Tree
         self._logger.info("Starting the CoAP Receiving Thread")
+        self._logger.info("Listening at URL: %s", agent_addr)
         self._listen_thread = CoapReceivingThread(resource_tree, self._listen_port, self._debug)
         self._listen_thread.start()
 

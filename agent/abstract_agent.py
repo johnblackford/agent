@@ -302,7 +302,7 @@ class AbstractAgent(object):
 class BindingListener(threading.Thread):
     """Listen to a specific Binding for incoming Requests"""
     def __init__(self, thread_name, binding, msg_handler, timeout=15):
-        """Initialize the STOMP Binding Listener"""
+        """Initialize the Binding Listener"""
         threading.Thread.__init__(self, name="BindingListener-" + thread_name)
         self._binding = binding
         self._timeout = timeout
@@ -375,21 +375,26 @@ class BindingListener(threading.Thread):
 class AbstractPeriodicNotifHandler(threading.Thread):
     """An Abstract Periodic Notification Handler that is extended for specific bindings such that
         a Periodic Notification is issued via the appropriate binding every Interval"""
-    def __init__(self, database, thread_name, from_id, to_id, subscription_id, param):
+    def __init__(self, database, thread_name, from_id, to_id, subscription_id, path_to_periodic_params):
         """Initialize the Periodic Notification Handler"""
         threading.Thread.__init__(self, name="PeriodicNotifHandler-" + thread_name)
         self._db = database
-        self._param = param
         self._to_id = to_id
         self._from_id = from_id
+        self._path = path_to_periodic_params
         self._subscription_id = subscription_id
         self._logger = logging.getLogger(self.__class__.__name__)
+        self._binding = None
 
+
+    def set_binding(self, binding):
+        """Configure the USP Binding to use when sending the Notification"""
+        self._binding = binding
 
     def run(self):
         """Thread execution code - issue a Periodic Notification every periodic_interval seconds"""
         binding_exists = True
-        periodic_interval_param_name = self._param + "PeriodicInterval"
+        periodic_interval_param_name = self._path + "PeriodicInterval"
 
         while binding_exists:
             try:
@@ -399,7 +404,7 @@ class AbstractPeriodicNotifHandler(threading.Thread):
 
                 self._logger.info("Sending a Periodic Notification to %s", self._to_id)
                 notif = notify.PeriodicNotification(self._from_id, self._to_id,
-                                                    self._subscription_id, self._param)
+                                                    self._subscription_id, self._path)
                 binding_exists = self._handle_periodic(notif)
             except agent_db.NoSuchPathError:
                 binding_exists = False

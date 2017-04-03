@@ -60,22 +60,25 @@ class CoapAgent(abstract_agent.AbstractAgent):
         ip_addr = self._get_ip_addr(net_intf)
         if ip_addr is not None:
             url = "coap://" + ip_addr + ":" + str(port) + "/" + resource_path
-            self._db.update("Device.LocalAgent.MTP.1.Enable", True)   # Enable the CoAP MTP
-            self._db.update("Device.LocalAgent.MTP.1.CoAP.URL", url)  # Set the CoAP MTP URL
-            self._db.update("Device.LocalAgent.MTP.2.Enable", False)  # Disable the STOMP MTP
-            self._logger.info("Listening at URL: %s", url)
+            num_local_agent_coap_mtps = self._init_db_for_mtp(url)
 
-            self._binding = coap_usp_binding.CoapUspBinding(port, resource_path=resource_path, debug=debug)
-            self._binding.listen(self._endpoint_id)
+            # We only support 1 Local Agent CoAP MTP
+            if num_local_agent_coap_mtps == 1:
+                self._binding = coap_usp_binding.CoapUspBinding(port, resource_path=resource_path, debug=debug)
+                self._binding.listen(self._endpoint_id, url)
 
-            self._mdns_announcer = mdns.Announcer(ip_addr, port, resource_path, self._endpoint_id)
-            self._mdns_announcer.announce(self._get_friendly_name(), self._get_subtypes())
+                self._mdns_announcer = mdns.Announcer(ip_addr, port, resource_path, self._endpoint_id)
+                self._mdns_announcer.announce(self._get_friendly_name(), self._get_subtypes())
 
-            value_change_notif_poller = CoapValueChangeNotifPoller(self._db)
-            value_change_notif_poller.set_binding(self._binding)
-            self.set_value_change_notif_poller(value_change_notif_poller)
+                value_change_notif_poller = CoapValueChangeNotifPoller(self._db)
+                value_change_notif_poller.set_binding(self._binding)
+                self.set_value_change_notif_poller(value_change_notif_poller)
 
-            self.init_subscriptions()
+                self.init_subscriptions()
+            else:
+                self._can_start = False
+                self._logger.error("The Agent must have 1 and only 1 CoAP Local Agent MTP , %s were found - EXITING",
+                                   str(num_local_agent_coap_mtps))
         else:
             self._can_start = False
             self._logger.error("IP Address could not be found for provided Network Interface [%s] - EXITING",
@@ -110,6 +113,21 @@ class CoapAgent(abstract_agent.AbstractAgent):
     def _get_supported_protocol(self):
         """Return the supported Protocol as a String: CoAP, STOMP, HTTP/2, WebSockets"""
         return "CoAP"
+
+    def _init_db_for_mtp(self, url):
+        """Enable the LocalAgent MTPs for the supported protocol and Disable all other LocalAgent MTPs"""
+        coap_mtp_count = 0
+        agent_mtp_instances = self._db.find_instances("Device.LocalAgent.MTP.")
+
+        for agent_mtp_path in agent_mtp_instances:
+            if self._db.get(agent_mtp_path + "Protocol") == self._get_supported_protocol():
+                coap_mtp_count += 1
+                self._db.update(agent_mtp_path + "Enable", True)
+                self._db.update(agent_mtp_path + "CoAP.URL", url)
+            else:
+                self._db.update(agent_mtp_path + "Enable", False)
+
+        return coap_mtp_count
 
     def _get_notification_sender(self, notif, controller_id, mtp_param_path):
         """Return an instance of a binding specific AbstractNotificationSender"""
@@ -201,18 +219,15 @@ class CoapBindingListener(abstract_agent.BindingListener):
 
 class CoapPeriodicNotifHandler(abstract_agent.AbstractPeriodicNotifHandler):
     """Issue a Periodic Notifications via a CoAP Binding"""
-    def __init__(self, database, mtp_param_path, from_id, to_id, subscription_id, param, controller_url):
+    def __init__(self, database, mtp_param_path, from_id, to_id, subscription_id,
+                 path_to_periodic_params, controller_url):
         """Initialize the CoAP Periodic Notification Handler"""
         abstract_agent.AbstractPeriodicNotifHandler.__init__(self, database, mtp_param_path,
-                                                             from_id, to_id, subscription_id, param)
-        self._binding = None
+                                                             from_id, to_id, subscription_id,
+                                                             path_to_periodic_params)
         self._mtp_param_path = mtp_param_path
         self._controller_url = controller_url
 
-
-    def set_binding(self, binding):
-        """Configure the CoAP Binding to use when sending the Notification"""
-        self._binding = binding
 
     def _handle_periodic(self, notif):
         """Handle the CoAP Periodic Notification"""

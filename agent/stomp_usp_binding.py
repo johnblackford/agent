@@ -87,7 +87,8 @@ class MyStompConnListener(stomp.ConnectionListener):
 
 class StompUspBinding(generic_usp_binding.GenericUspBinding):
     """A STOMP to USP Binding"""
-    def __init__(self, host="127.0.0.1", port=61613, username="admin", password="admin", debug=False):
+    def __init__(self, host="127.0.0.1", port=61613, username="admin", password="admin", virtual_host="/",
+                 outgoing_heartbeats=0, incoming_heartbeats=0, debug=False):
         """Initialize the STOMP USP Binding for a USP Endpoint
             - 61613 is the default STOMP port for RabbitMQ installations"""
         generic_usp_binding.GenericUspBinding.__init__(self)
@@ -100,7 +101,8 @@ class StompUspBinding(generic_usp_binding.GenericUspBinding):
         self._logger = logging.getLogger(self.__class__.__name__)
 
         # If we don't use auto_decode=False, then we get decode problems
-        self._conn = stomp.Connection12([(host, port)], vhost="/", auto_decode=False)
+        self._conn = stomp.Connection12([(host, port)], heartbeats=(outgoing_heartbeats, incoming_heartbeats),
+                                        vhost=virtual_host, auto_decode=False)
         self._conn.set_listener("defaultListener", self._listener)
         self._conn.start()
         self._conn.connect(username, password, wait=True)
@@ -113,10 +115,9 @@ class StompUspBinding(generic_usp_binding.GenericUspBinding):
         self._logger.info("Sending a STOMP message to the following address: %s", to_addr)
         self._logger.debug("Payload being sent: [%s]", serialized_msg)
 
-    def listen(self, endpoint_id):
+    def listen(self, endpoint_id, agent_addr):
         """Listen to a STOMP destination for incoming messages"""
         msg_id = 1
-        full_dest = "/queue/" + endpoint_id
 
         #TODO: Handle the ID Better
         # Need a unique ID per destination being subscribed to
@@ -126,7 +127,8 @@ class StompUspBinding(generic_usp_binding.GenericUspBinding):
         #   - Bulld the full destination: self._build_dest(dest)
         #   - Retrieve the ID from the dictionary for the destination
         #   - Unsubscribe: self._conn.unsubscribe(id)
-        self._conn.subscribe(full_dest, id=str(msg_id), ack="auto")
+        self._conn.subscribe(agent_addr, id=str(msg_id), ack="auto")
+        self._logger.info("Subscribed to Destination: %s", agent_addr)
 
     def clean_up(self):
         """Clean up the STOMP Connection"""

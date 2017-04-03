@@ -100,7 +100,7 @@ class GenericUspBinding(object):
         """Send the ProtoBuf Serialized Message to the provided address via the Protocol-specific USP Binding"""
         raise NotImplementedError()
 
-    def listen(self, endpoint_id):
+    def listen(self, endpoint_id, agent_addr):
         """Listen for incoming messages on the Protocol-specific USP Binding"""
         raise NotImplementedError()
 
