@@ -135,6 +135,8 @@ class StompAgent(abstract_agent.AbstractAgent):
                         if controller_stomp_conn not in self._controller_stomp_conn_ref_dict:
                             self._controller_stomp_conn_ref_dict[controller_stomp_conn] = {}
 
+                        self._logger.info("Found STOMP Controller [%s] on Server [%s] and Destination [%s]",
+                                          controller_id, controller_stomp_conn, controller_stomp_dest)
                         self._controller_stomp_conn_ref_dict[controller_stomp_conn][controller_id] = \
                             controller_stomp_dest
                     else:
@@ -166,6 +168,8 @@ class StompAgent(abstract_agent.AbstractAgent):
 
                     if self._db.get(agent_stomp_conn + "Enable"):
                         if agent_stomp_conn in self._controller_stomp_conn_ref_dict:
+                            self._logger.info("Found STOMP MTP on Server [%s] and Destination [%s]",
+                                              agent_stomp_conn, agent_dest)
                             agent_stomp_conn_dict[agent_stomp_conn] = agent_dest
                         else:
                             self._logger.warning("Skipping Agent's MTP [%s], no associated Controller", mtp_alias)
