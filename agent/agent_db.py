@@ -230,12 +230,12 @@ class Database(object):
         if partial_path.endswith("."):
             # Turn the incoming path into a regex to validate it is in the implemented data model
             dm_regex_str = self._dm_regex(partial_path, True)
-            logger.debug("find_instances: Using regex \"%s\" to validate Path [%s] is in the Implemented Data Model",
+            logger.debug("find_objects: Using regex \"%s\" to validate Path [%s] is in the Implemented Data Model",
                          dm_regex_str, partial_path)
 
             # Turn the incoming path into a regex to get the matching paths
             db_regex_str = self._db_regex(partial_path, True)
-            logger.debug("find_instances: Using regex \"%s\" to retrieve values from the Database for Path [%s]",
+            logger.debug("find_objects: Using regex \"%s\" to retrieve values from the Database for Path [%s]",
                          db_regex_str, partial_path)
         else:
             raise NoSuchPathError(partial_path)
