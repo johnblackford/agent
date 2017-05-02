@@ -209,7 +209,7 @@ class Database(object):
                 if re.fullmatch(db_regex_str, path) is not None:
                     # We only want the path to the next level (instance identifiers)
                     path_parts = path.split(".")
-                    built_path = self._build_path_from_parts(path_parts, partial_path_part_len)
+                    built_path = utils.PathHelper.build_path_from_parts(path_parts, partial_path_part_len)
                     found_key = built_path + path_parts[partial_path_part_len] + "."
 
                     if not self._is_meta_parameter(path_parts, partial_path_part_len):
@@ -255,7 +255,7 @@ class Database(object):
                 if re.fullmatch(db_regex_str, path) is not None:
                     # We only want the path to the next level (instance identifiers)
                     path_parts = path.split(".")
-                    found_key = self._build_path_from_parts(path_parts, partial_path_part_len)
+                    found_key = utils.PathHelper.build_path_from_parts(path_parts, partial_path_part_len)
 
                     if found_key not in found_keys:
                         found_keys.append(found_key)
@@ -293,7 +293,7 @@ class Database(object):
 
                 if next_level:
                     if key_parts_len > partial_path_part_len + 1:
-                        built_path = self._build_path_from_parts(key_parts, partial_path_part_len)
+                        built_path = utils.PathHelper.build_path_from_parts(key_parts, partial_path_part_len)
                         found_key = built_path + key_parts[partial_path_part_len] + "."
                 else:
                     inx = 0
@@ -398,20 +398,6 @@ class Database(object):
         generic_path = re.sub(r'\.\*\.', r'.{i}.', generic_path)  # Wild-card Searching
 
         return generic_path
-
-    def _build_path_from_parts(self, path_parts, partial_path_part_len):
-        """Build a search path from the tokenized path (path parts)"""
-        built_path = ""
-        built_path_part_count = 0
-
-        # We only want the path to the next level (instance identifiers)
-        for part in path_parts:
-            built_path_part_count += 1
-            built_path = built_path + part + "."
-            if built_path_part_count == partial_path_part_len:
-                break
-
-        return built_path
 
     def _is_meta_parameter(self, path_parts, partial_path_part_len):
         """Determine if the parameter is a meta parameter"""
