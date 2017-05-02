@@ -121,6 +121,35 @@ class MessageIdHelper:
 
 
 
+class PathHelper(object):
+    """A Parameter Path Helper Class"""
+    @staticmethod
+    def build_path_from_parts(path_parts, partial_path_part_len):
+        """Build a sub-path from the provided path parts"""
+        built_path = ""
+        append_param = False
+        built_path_part_count = 0
+
+        if isinstance(path_parts, list):
+            if partial_path_part_len >= len(path_parts):
+                partial_path_part_len = len(path_parts) - 1
+                append_param = True
+
+            # We only want the path to the specified level
+            if partial_path_part_len > 0:
+                for part in path_parts:
+                    built_path_part_count += 1
+                    built_path = built_path + part + "."
+                    if built_path_part_count == partial_path_part_len:
+                        break
+
+            if append_param:
+                built_path += path_parts[len(path_parts) - 1]
+
+        return built_path
+
+
+
 class IPAddr:
     """IP Address Retrieval Tool"""
     @staticmethod
