@@ -363,7 +363,7 @@ class BindingListener(threading.Thread):
             self._logger.info("Sending a [%s] Response to Endpoint Address [%s]",
                               resp.body.response.WhichOneof("resp_type"), to_addr)
         elif resp.body.HasField("error"):
-            self._logger.info("Responding with an Error to Endpoint Address [%s]". to_addr)
+            self._logger.info("Responding with an Error to Endpoint Address [%s]", to_addr)
         else:
             self._logger.warning("Sending an Unknown Response")
 
