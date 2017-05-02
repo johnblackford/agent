@@ -80,25 +80,39 @@ class BootNotification(Notification):
 
     def generate_notif_msg(self):
         """Generate an appropriate USP Notification"""
+        map_as_str = ""
         notif = usp.Msg()
+        first_entry = True
         self._init_notif(notif)
+
+        # TODO: Replace hard-coded list with data model driven list
         boot_param_list = ["Device.DeviceInfo.ManufacturerOUI",
                            "Device.DeviceInfo.ProductClass",
                            "Device.DeviceInfo.SerialNumber",
                            "Device.LocalAgent.X_ARRIS-COM_IPAddr"]
 
-        notif.body.request.notify.boot.command_key = ""
-        notif.body.request.notify.boot.cause = usp.Notify.Boot.LOCAL_REBOOT
-        notif.body.request.notify.boot.obj_ref = "Device.LocalAgent."
+        notif.body.request.notify.event.obj_path = "Device.LocalAgent."
+        notif.body.request.notify.event.event_name = "Boot!"
+        notif.body.request.notify.event.param_map["CommandKey"] = ""
+        notif.body.request.notify.event.param_map["Cause"] = "LocalReboot"
 
         for path in boot_param_list:
             value = self._db.get(path)
-            if value is not None:
-                notif.body.request.notify.boot.param_map[path] = value
-            else:
-                self._logger.warning("Boot Param [%s] is None", path)
-                notif.body.request.notify.boot.param_map[path] = ""
 
+            if first_entry:
+                first_entry = False
+            else:
+                map_as_str += ","
+
+            map_as_str += "\"" + path + "\""
+            map_as_str += " : "
+            if value is not None:
+                map_as_str += "\"" + str(value) + "\""
+            else:
+                map_as_str += "\"\""
+                self._logger.warning("Boot Param [%s] is None", path)
+
+        notif.body.request.notify.event.param_map["BootParameterMap"] = map_as_str
         return notif
 
 
@@ -137,6 +151,7 @@ class PeriodicNotification(Notification):
         notif = usp.Msg()
         self._init_notif(notif)
 
-        notif.body.request.notify.periodic.obj_ref = self._param
+        notif.body.request.notify.event.obj_path = "Device.LocalAgent."
+        notif.body.request.notify.event.event_name = "Periodic!"
 
         return notif

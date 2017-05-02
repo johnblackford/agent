@@ -148,21 +148,34 @@ class UspRequestHandler(object):
         self._populate_resp_header(req, resp, usp.Header.GET_RESP)
 
         # Process the Parameter Paths in the Get Request
-        for req_path in req.body.request.get.param_path:
+        for req_path in req.body.request.get.param_path_list:
             path_result = usp.GetResp.RequestedPathResult()
             path_result.requested_path = req_path
 
             try:
-                if req_path.endswith(".") or "*" in req_path or "{" in req_path:
-                    # If the path is a partial path or has wild-cards, then get all
-                    #  full paths before requesting their values
-                    items = self._db.find_params(req_path)
+                resolved_path_list = []
+                partial_path, param_name = self._split_path(req_path)
+                self._logger.debug("Split into [%s] and [%s]", partial_path, param_name)
+                affected_path_list = self._get_affected_paths(partial_path)
 
-                    for item in items:
-                        path_result.result_param_map[item] = str(self._db.get(item))
-                else:
-                    # If the path is full, then just get its value
-                    path_result.result_param_map[req_path] = str(self._db.get(req_path))
+                for affected_path in affected_path_list:
+                    self._logger.debug("Requested Path [%s] resolved to: %s", req_path, affected_path)
+                    resolved_path_result = usp.GetResp.ResolvedPathResult()
+                    resolved_path_result.resolved_path = affected_path
+
+                    if param_name is None:
+                        items = self._db.find_params(affected_path)
+
+                        for item in items:
+                            param_path = self._diff_paths(affected_path, item)
+                            resolved_path_result.result_param_map[param_path] = str(self._db.get(item))
+                    else:
+                        param = affected_path + param_name
+                        resolved_path_result.result_param_map[param_name] = str(self._db.get(param))
+
+                    resolved_path_list.append(resolved_path_result)
+
+                path_result.resolved_path_result_list.extend(resolved_path_list)
             except agent_db.NoSuchPathError:
                 self._logger.warning("Invalid Path encountered: %s", req_path)
                 path_result.err_code = 11002
@@ -170,13 +183,13 @@ class UspRequestHandler(object):
 
             path_result_list.append(path_result)
 
-        resp.body.response.get_resp.req_path_result.extend(path_result_list)
+        resp.body.response.get_resp.req_path_result_list.extend(path_result_list)
 
         return resp
 
     def _process_get_instances(self, req):
         """Process an incoming GetInstances and generate a GetInstancesResp"""
-        # TODO: Dead Code - GetInstances was removed in favor of GetObjects
+        # TODO: GetInstances is back!  Make sure this code works for the new version of it
         pass
         """
         resp = usp.Msg()
@@ -207,7 +220,7 @@ class UspRequestHandler(object):
 
     def _process_get_impl_objects(self, req):
         """Process an incoming GetImplObjects and generate a GetImplObjectsResp"""
-        # TODO: Dead Code - GetImplObjects was removed in favor of GetObjects
+        # TODO: GetImplObjects was replaced with GetSupportedDM; how much of this can be reused?
         pass
         """
         resp = usp.Msg()
@@ -256,13 +269,13 @@ class UspRequestHandler(object):
             usp_err_msg = utils.UspErrMsg(req.header.msg_id, req.header.from_id, self._id)
             err_msg = "Invalid Path Found, Allow Partial Updates = False :: Fail the entire Set"
             resp = usp_err_msg.generate_error(9000, err_msg)
-            resp.body.error.param_err.extend(set_failure_param_err_list)
+            resp.body.error.param_err_list.extend(set_failure_param_err_list)
         else:
             # Process the Updates against the database
             for param_path in path_to_set_dict:
                 self._db.update(param_path, path_to_set_dict[param_path])
 
-            resp.body.response.set_resp.updated_obj_result.extend(update_obj_result_list)
+            resp.body.response.set_resp.updated_obj_result_list.extend(update_obj_result_list)
 
         return resp
 
@@ -272,7 +285,7 @@ class UspRequestHandler(object):
         allow_partial_updates = req.body.request.set.allow_partial
 
         # Loop through each UpdateObject
-        for obj_to_update in req.body.request.set.update_obj:
+        for obj_to_update in req.body.request.set.update_obj_list:
             update_inst_result_list = []
             obj_path_set_failure_err_dict = {}
             obj_path_to_update = obj_to_update.obj_path
@@ -294,7 +307,7 @@ class UspRequestHandler(object):
                     # If there were no Set Failure errors for the obj_to_update, oper_success
                     update_obj_result = usp.SetResp.UpdatedObjectResult()
                     update_obj_result.requested_path = obj_path_to_update
-                    update_obj_result.oper_status.oper_success.updated_inst_result.extend(update_inst_result_list)
+                    update_obj_result.oper_status.oper_success.updated_inst_result_list.extend(update_inst_result_list)
                     update_obj_result_list.append(update_obj_result)
                 else:
                     self._handle_set_param_errors(obj_path_to_update, allow_partial_updates,
@@ -304,54 +317,6 @@ class UspRequestHandler(object):
                 self._handle_set_validation_err(obj_path_to_update, allow_partial_updates,
                                                 sv_err, update_obj_result_list, set_failure_param_err_list)
 
-    def _get_affected_paths(self, obj_path_to_update):
-        """
-          Retrieve the affected paths based on the incoming obj_path:
-            - Retrieve existing Paths (including general validation and that it is supported)
-        """
-        is_static_path = self._is_set_path_static(obj_path_to_update)
-        is_search_path = self._is_set_path_searching(obj_path_to_update)
-
-        try:
-            affected_path_list = self._db.find_objects(obj_path_to_update)
-
-            if len(affected_path_list) == 0:
-                if is_search_path or is_static_path:
-                    pass
-                else:
-                    err_code = 9000
-                    err_msg = "Non-existent obj_path encountered - {}".format(obj_path_to_update)
-                    raise SetValidationError(err_code, err_msg)
-        except agent_db.NoSuchPathError:
-            err_code = 9000
-            err_msg = "Invalid obj_path encountered - {}".format(obj_path_to_update)
-            raise SetValidationError(err_code, err_msg)
-
-        return affected_path_list
-
-    def _is_set_path_static(self, obj_path_to_update):
-        """
-          Check to see tha the obj_path_to_update doesn't contain:
-            - Instance Number based addressing elements
-            - FUTURE: Unique Key based addressing elements
-            - wildcard-based searching elements
-            - FUTURE: expression-based searching elements
-        """
-        if not self._is_set_path_searching(obj_path_to_update):
-            pattern = re.compile(r'\.[0-9]+\.')
-            if pattern.search(obj_path_to_update) is None:
-                return True
-
-        return False
-
-    def _is_set_path_searching(self, obj_path_to_update):
-        """
-          Check to see if the obj_path_to_update contains:
-            - wildcard-based searching elements
-            - FUTURE: expression-based searching elements
-        """
-        return ".*." in obj_path_to_update
-
     def _validate_set_params(self, affected_path, obj_to_update, path_to_set_dict):
         """Validate the parameters related to the affected path"""
         param_err_list = []
@@ -360,7 +325,7 @@ class UspRequestHandler(object):
         update_inst_result.affected_path = affected_path
 
         # Loop through each parameter to validate it
-        for param_to_update in obj_to_update.param_setting:
+        for param_to_update in obj_to_update.param_setting_list:
             err_msg = ""
             param_failure = False
             param_path = affected_path + param_to_update.param
@@ -394,7 +359,7 @@ class UspRequestHandler(object):
                 else:
                     param_err_list.append(param_err)
 
-        update_inst_result.param_err.extend(param_err_list)
+        update_inst_result.param_err_list.extend(param_err_list)
 
         return set_failure_err_list, update_inst_result
 
@@ -420,20 +385,19 @@ class UspRequestHandler(object):
                 for param_err in obj_path_set_failure_err_dict[affected_path]:
                     param_err_list.append(param_err)
 
-                failure.param_err.extend(param_err_list)
+                failure.param_err_list.extend(param_err_list)
                 failure_list.append(failure)
 
-            update_obj_result.oper_status.oper_failure.updated_inst_failure.extend(failure_list)
+            update_obj_result.oper_status.oper_failure.updated_inst_failure_list.extend(failure_list)
             update_obj_result_list.append(update_obj_result)
         else:
             # Set Failures are handled via ParamError on an Error message
             for affected_path in obj_path_set_failure_err_dict:
-                for param_name in obj_path_set_failure_err_dict[affected_path]:
+                for param_err in obj_path_set_failure_err_dict[affected_path]:
                     set_failure_param_err = usp.Error.ParamError()
-                    set_failure_param_err.param_path = affected_path + param_name
-                    set_failure_param_err.err_code = 9000
-                    set_failure_param_err.err_msg = "Failed to Set Required Parameter: " + \
-                                                    obj_path_set_failure_err_dict[affected_path][param_name]
+                    set_failure_param_err.param_path = affected_path + param_err.param
+                    set_failure_param_err.err_code = param_err.err_code
+                    set_failure_param_err.err_msg = param_err.err_msg
                     set_failure_param_err_list.append(set_failure_param_err)
 
     def _handle_set_validation_err(self, obj_path_to_update, allow_partial_updates, sv_err,
@@ -478,7 +442,7 @@ class UspRequestHandler(object):
                     out_arg_map[param] = param_map[param]
 
                 op_result_list.append(op_result)
-                resp.body.response.operate_resp.operation_result.extend(op_result_list)
+                resp.body.response.operate_resp.operation_result_list.extend(op_result_list)
             else:
                 # Invalid Command - return an Error
                 to_id = req.header.from_id
@@ -502,6 +466,92 @@ class UspRequestHandler(object):
         resp.header.to_id = req.header.from_id
         resp.header.from_id = self._id
         # Responses don't get responses, so no need for reply_to_id
+
+    def _split_path(self, path):
+        """Split an incoming path into its partial path and parameter name
+            - Return None for param_name if a partial path was provided"""
+        param_name = None
+
+        if path.endswith("."):
+            partial_path = path
+        else:
+            path_parts = path.split(".")
+            partial_path_len = len(path_parts) - 1
+            partial_path = utils.PathHelper.build_path_from_parts(path_parts, partial_path_len)
+            param_name = path_parts[partial_path_len]
+
+        return partial_path, param_name
+
+    def _diff_paths(self, negative_path, full_path):
+        """Construct a path that removes the negative_path portion from the full_path portion"""
+        index = 0
+        return_path = ""
+        negative_path_parts = negative_path.split(".")
+        full_path_parts = full_path.split(".")
+        num_full_path_parts = len(full_path_parts)
+
+        for negative_path_part in negative_path_parts:
+            if negative_path_part == full_path_parts[index]:
+                index += 1
+            else:
+                break
+
+        while index < num_full_path_parts:
+            return_path += full_path_parts[index]
+            if (index + 1) < num_full_path_parts:
+                return_path += "."
+            index += 1
+
+        return return_path
+
+    def _get_affected_paths(self, partail_path):
+        """
+          Retrieve the affected paths based on the incoming obj_path:
+            - Retrieve existing Paths (including general validation and that it is supported)
+        """
+        is_static_path = self._is_partial_path_static(partail_path)
+        is_search_path = self._is_partial_path_searching(partail_path)
+
+        try:
+            affected_path_list = self._db.find_objects(partail_path)
+
+            if len(affected_path_list) == 0:
+                if is_search_path or is_static_path:
+                    pass
+                else:
+                    err_code = 9000
+                    err_msg = "Non-existent obj_path encountered - {}".format(partail_path)
+                    raise SetValidationError(err_code, err_msg)
+        except agent_db.NoSuchPathError:
+            err_code = 9000
+            err_msg = "Invalid obj_path encountered - {}".format(partail_path)
+            raise SetValidationError(err_code, err_msg)
+
+        return affected_path_list
+
+    def _is_partial_path_static(self, partial_path):
+        """
+          Check to see that the partial_path doesn't contain:
+            - Instance Number based addressing elements
+            - FUTURE: Unique Key based addressing elements
+            - wildcard-based searching elements
+            - FUTURE: expression-based searching elements
+        """
+        if not self._is_partial_path_searching(partial_path):
+            pattern = re.compile(r'\.[0-9]+\.')
+            if pattern.search(partial_path) is None:
+                return True
+
+        return False
+
+    def _is_partial_path_searching(self, partial_path):
+        """
+          Check to see if the partial_path contains:
+            - wildcard-based searching elements
+            - FUTURE: expression-based searching elements
+        """
+        return ".*." in partial_path
+
 
 
 

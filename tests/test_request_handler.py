@@ -41,9 +41,9 @@ def test_is_set_path_static():
     mock_db = mock.create_autospec(agent_db.Database)
     req_handler = request_handler.UspRequestHandler(endpoint_id, mock_db)
 
-    assert req_handler._is_set_path_static("Device.LocalAgent."), "Static Path Failure"
-    assert not req_handler._is_set_path_static("Device.Controller.1."), "Instance Number Addressing Path Failure"
-    assert not req_handler._is_set_path_static("Device.Controller.*."), "Wildcard-based Searching Path Failure"
+    assert req_handler._is_partial_path_static("Device.LocalAgent."), "Static Path Failure"
+    assert not req_handler._is_partial_path_static("Device.Controller.1."), "Instance Number Addressing Path Failure"
+    assert not req_handler._is_partial_path_static("Device.Controller.*."), "Wildcard-based Searching Path Failure"
 
 
 """
@@ -56,6 +56,73 @@ def test_is_set_path_searching():
     mock_db = mock.create_autospec(agent_db.Database)
     req_handler = request_handler.UspRequestHandler(endpoint_id, mock_db)
 
-    assert not req_handler._is_set_path_searching("Device.LocalAgent."), "Static Path Failure"
-    assert not req_handler._is_set_path_searching("Device.Controller.1."), "Instance Number Addressing Path Failure"
-    assert req_handler._is_set_path_searching("Device.Controller.*."), "Wildcard-based Searching Path Failure"
+    assert not req_handler._is_partial_path_searching("Device.LocalAgent."), "Static Path Failure"
+    assert not req_handler._is_partial_path_searching("Device.Controller.1."), "Instance Number Addressing Path Failure"
+    assert req_handler._is_partial_path_searching("Device.Controller.*."), "Wildcard-based Searching Path Failure"
+
+
+"""
+ Tests for _split_path
+"""
+
+
+def test_split_path_full_path():
+    endpoint_id = "ENDPOINT-ID"
+    mock_db = mock.create_autospec(agent_db.Database)
+    req_handler = request_handler.UspRequestHandler(endpoint_id, mock_db)
+    path = "Device.LocalAgent.Controller.1.MTP.1.Protocol"
+
+    partial_path, param_name = req_handler._split_path(path)
+
+    assert partial_path == "Device.LocalAgent.Controller.1.MTP.1.", "Partial Path Failure"
+    assert param_name == "Protocol", "Parameter Name Failure"
+
+def test_split_path_partial_path():
+    endpoint_id = "ENDPOINT-ID"
+    mock_db = mock.create_autospec(agent_db.Database)
+    req_handler = request_handler.UspRequestHandler(endpoint_id, mock_db)
+    path = "Device.LocalAgent.Controller.1.MTP.1."
+
+    partial_path, param_name = req_handler._split_path(path)
+
+    assert partial_path == "Device.LocalAgent.Controller.1.MTP.1.", "Partial Path Failure"
+    assert param_name is None, "Parameter Name Failure, should be None"
+
+
+"""
+ Tests for _diff_paths
+"""
+
+
+def test_diff_paths_partial_path_req():
+    endpoint_id = "ENDPOINT-ID"
+    mock_db = mock.create_autospec(agent_db.Database)
+    req_handler = request_handler.UspRequestHandler(endpoint_id, mock_db)
+    req_path = "Device.LocalAgent.Controller."
+    param_path = "Device.LocalAgent.Controller.1.EndpointID"
+
+    diff_path = req_handler._diff_paths(req_path, param_path)
+
+    assert diff_path == "1.EndpointID"
+
+def test_diff_paths_wildcard_path_req():
+    endpoint_id = "ENDPOINT-ID"
+    mock_db = mock.create_autospec(agent_db.Database)
+    req_handler = request_handler.UspRequestHandler(endpoint_id, mock_db)
+    req_path = "Device.LocalAgent.Controller.*."
+    param_path = "Device.LocalAgent.Controller.1.EndpointID"
+
+    diff_path = req_handler._diff_paths(req_path, param_path)
+
+    assert diff_path == "1.EndpointID"
+
+def test_diff_paths_multiple_wildcard_path_req():
+    endpoint_id = "ENDPOINT-ID"
+    mock_db = mock.create_autospec(agent_db.Database)
+    req_handler = request_handler.UspRequestHandler(endpoint_id, mock_db)
+    req_path = "Device.LocalAgent.Controller.*.MTP.*."
+    param_path = "Device.LocalAgent.Controller.1.MTP.2.Protocol"
+
+    diff_path = req_handler._diff_paths(req_path, param_path)
+
+    assert diff_path == "1.MTP.2.Protocol"
