@@ -156,7 +156,7 @@ class UspRequestHandler(object):
                 resolved_path_list = []
                 partial_path, param_name = self._split_path(req_path)
                 self._logger.debug("Split into [%s] and [%s]", partial_path, param_name)
-                affected_path_list = self._get_affected_paths(partial_path)
+                affected_path_list = self._get_affected_paths_for_get(partial_path)
 
                 for affected_path in affected_path_list:
                     self._logger.debug("Requested Path [%s] resolved to: %s", req_path, affected_path)
@@ -291,7 +291,7 @@ class UspRequestHandler(object):
             obj_path_to_update = obj_to_update.obj_path
 
             try:
-                affected_path_list = self._get_affected_paths(obj_path_to_update)
+                affected_path_list = self._get_affected_paths_for_set(obj_path_to_update)
 
                 # For each Affected Path, update the Parameter Settings
                 for affected_path in affected_path_list:
@@ -504,27 +504,38 @@ class UspRequestHandler(object):
 
         return return_path
 
-    def _get_affected_paths(self, partail_path):
+    def _get_affected_paths_for_get(self, partial_path):
         """
           Retrieve the affected paths based on the incoming obj_path:
-            - Retrieve existing Paths (including general validation and that it is supported)
+            - For Get Messages, we only want to validate that it is a supported path, even if instances are not there
         """
-        is_static_path = self._is_partial_path_static(partail_path)
-        is_search_path = self._is_partial_path_searching(partail_path)
+        affected_path_list = self._db.find_objects(partial_path)
+        num_affected_path_list = len(affected_path_list)
+        self._logger.info("Found [%s] Affected Paths for %s", str(num_affected_path_list), partial_path)
+
+        return affected_path_list
+
+    def _get_affected_paths_for_set(self, partial_path):
+        """
+          Retrieve the affected paths based on the incoming obj_path:
+            - For Set Messages, we only want existing Paths (including general validation and that it is supported)
+        """
+        is_static_path = self._is_partial_path_static(partial_path)
+        is_search_path = self._is_partial_path_searching(partial_path)
 
         try:
-            affected_path_list = self._db.find_objects(partail_path)
+            affected_path_list = self._db.find_objects(partial_path)
 
             if len(affected_path_list) == 0:
                 if is_search_path or is_static_path:
                     pass
                 else:
                     err_code = 9000
-                    err_msg = "Non-existent obj_path encountered - {}".format(partail_path)
+                    err_msg = "Non-existent obj_path encountered - {}".format(partial_path)
                     raise SetValidationError(err_code, err_msg)
         except agent_db.NoSuchPathError:
             err_code = 9000
-            err_msg = "Invalid obj_path encountered - {}".format(partail_path)
+            err_msg = "Invalid obj_path encountered - {}".format(partial_path)
             raise SetValidationError(err_code, err_msg)
 
         return affected_path_list
