@@ -41,7 +41,7 @@
 
 import time
 import logging
-import threading
+import collections
 
 
 
@@ -49,28 +49,27 @@ class GenericUspBinding(object):
     """A Generic USP Binding class to be used by specific protocol USP Binding classes"""
     def __init__(self, sleep_time_interval=1):
         """Initialize the Generic USP Binding"""
-        self._incoming_queue = []
-        self._queue_lock = threading.Lock()
+        self._incoming_queue = collections.deque()
         self._sleep_time_interval = sleep_time_interval
         self._logger = logging.getLogger(self.__class__.__name__)
 
 
     def push(self, payload):
         """Push the provided message payload onto the end of the incoming message queue"""
-        with self._queue_lock:
-            self._logger.debug("Pushing a payload onto the end of the incoming message queue")
-            self._incoming_queue.append(payload)
+        self._logger.debug("Pushing a payload onto the end of the incoming message queue")
+        self._incoming_queue.append(ExpiringQueueItem(payload))
 
     def pop(self):
         """Pop the next payload off of the front of the incoming message queue"""
         payload = None
 
-        with self._queue_lock:
-            queue_len = len(self._incoming_queue)
-
-            if queue_len > 0:
-                self._logger.debug("Popping the next payload from the front of the incoming message queue")
-                payload = self._incoming_queue.pop(0)
+        if len(self._incoming_queue) > 0:
+            queue_item = self._incoming_queue.popleft()
+            if not queue_item.is_expired():
+                payload = queue_item.get_payload()
+                self._logger.debug("Popped the next payload from the front of the incoming message queue")
+            else:
+                self._logger.info("Popped an expired payload, try again!")
 
         return payload
 
@@ -107,3 +106,26 @@ class GenericUspBinding(object):
     def clean_up(self):
         """Clean-up the Protocol-specific USP Binding after we are finished"""
         raise NotImplementedError()
+
+
+
+class ExpiringQueueItem(object):
+    """A Queue Item that has a TTL and a Payload"""
+    def __init__(self, payload, ttl=60):
+        """Initialize the ExpiringQueueItem with the payload and a TTL (default of 60 seconds)"""
+        self._ttl = ttl
+        self._payload = payload
+        self._create_time = time.time()
+        self._logger = logging.getLogger(self.__class__.__name__)
+
+    def is_expired(self):
+        """Return true if the Queue Item is older than its TTL"""
+        if (self._create_time + self._ttl) < time.time():
+            self._logger.warning("Expiring a Queue Item")
+            return True
+
+        return False
+
+    def get_payload(self):
+        """Retrieve the Payload"""
+        return self._payload
