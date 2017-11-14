@@ -85,7 +85,7 @@ class Agent(object):
             logging.info("## Starting a STOMP USP Agent                        ##")
             logging.info("#######################################################")
 
-            my_stomp_agent = stomp_agent.StompAgent(dm_file_name, db_file_name, net_intf, cfg_file_name)
+            my_stomp_agent = stomp_agent.StompAgent(dm_file_name, db_file_name, net_intf, cfg_file_name, debug)
             my_stomp_agent.start_listening()
             my_stomp_agent.clean_up()
 
@@ -94,6 +94,7 @@ class Agent(object):
 def main():
     """Main Processing for USP Agent"""
     Agent("cfg/agent.json", "logs/agent.log")
+#    Agent("cfg/agent.json", "logs/agent.log", log_level=logging.DEBUG)
 
 
 

@@ -25,7 +25,7 @@
 	"Device.LocalAgent.Controller.{i}.Alias": "readWrite",
 	"Device.LocalAgent.Controller.{i}.EndpointID": "readWrite",
 	"Device.LocalAgent.Controller.{i}.ProvisioningCode": "readWrite",
-	"Device.LocalAgent.Controller.{i}.PeriodicInterval": "readWrite",
+	"Device.LocalAgent.Controller.{i}.PeriodicNotifInterval": "readWrite",
 	"Device.LocalAgent.Controller.{i}.MTPNumberOfEntries": "readOnly",
 	"Device.LocalAgent.Controller.{i}.MTP.{i}.Enable": "readWrite",
 	"Device.LocalAgent.Controller.{i}.MTP.{i}.Alias": "readWrite",

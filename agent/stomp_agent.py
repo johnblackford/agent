@@ -54,9 +54,9 @@ from agent import stomp_usp_binding
 
 class StompAgent(abstract_agent.AbstractAgent):
     """A USP Agent that uses the STOMP Binding"""
-    def __init__(self, dm_file, db_file, net_intf, cfg_file_name="cfg/agent.json"):
+    def __init__(self, dm_file, db_file, net_intf, cfg_file_name="cfg/agent.json", debug=False):
         """Initialize the STOMP Agent"""
-        abstract_agent.AbstractAgent.__init__(self, dm_file, db_file, net_intf, cfg_file_name)
+        abstract_agent.AbstractAgent.__init__(self, dm_file, db_file, net_intf, cfg_file_name, debug)
         self._binding_dict = {}
 
         # Format: { StompConnRef : { ControllerID : StompDestination } }

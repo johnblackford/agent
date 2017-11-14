@@ -97,6 +97,12 @@ class MyCoapResource(aiocoap.resource.Resource):
         """CoAP Resource for USP - handle the POST Method"""
         self._logger.info("POST:: Received a CoAP Request on the USP Resource")
         self._logger.debug("Payload received: [%s]", request.payload)
+        self._logger.debug("Incoming Request opt.uri_path: [%s]", request.opt.uri_path)
+        self._logger.debug("Incoming Request opt.uri_query: [%s]", request.opt.uri_query)
+        self._logger.debug("Incoming Request opt.location_path: [%s]", request.opt.location_path)
+        self._logger.debug("Incoming Request opt.location_query: [%s]", request.opt.location_query)
+        self._logger.debug("Incoming Request opt.uri_host: [%s]", request.opt.uri_host)
+        self._logger.debug("Incoming Request opt.uri_port: [%s]", request.opt.uri_port)
 
         if request.opt.content_format == 42:
             if self._binding.validate_payload(request.payload):

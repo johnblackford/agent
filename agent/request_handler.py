@@ -47,8 +47,9 @@ TAKE_PICTURE_CAMERA_OP = "Device.Services.HomeAutomation.1.Camera.1.TakePicture(
 
 class UspRequestHandler(object):
     """A USP Message Handler: to be used by a USP Agent"""
-    def __init__(self, endpoint_id, agent_database, service_map=None):
+    def __init__(self, endpoint_id, agent_database, service_map=None, debug=False):
         """Initialize the USP Request Handler"""
+        self._debug = debug
         self._id = endpoint_id
         self._db = agent_database
         self._service_map = service_map
@@ -65,6 +66,9 @@ class UspRequestHandler(object):
         req.ParseFromString(msg_payload)
         self._logger.debug("Incoming payload parsed via Protocol Buffers")
 
+        if self._debug:
+            print("Incoming Request:\n{}".format(req))
+
         try:
             # Validate the payload before processing it
             self._validate_request(req)
@@ -72,6 +76,8 @@ class UspRequestHandler(object):
                               req.body.request.WhichOneof("req_type"))
 
             resp = self._process_request(req)
+            if self._debug:
+                print("Outgoing Response:\n{}".format(resp))
         except ProtocolValidationError as err:
             err_msg = "USP Message validation failed: {}".format(err)
             self._logger.error("%s", err_msg)

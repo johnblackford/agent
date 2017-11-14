@@ -52,7 +52,7 @@ class CoapAgent(abstract_agent.AbstractAgent):
     """A USP Agent that uses the CoAP Binding"""
     def __init__(self, dm_file, db_file, net_intf, port=5683, cfg_file_name="cfg/agent.json", debug=False):
         """Initialize the CoAP Agent"""
-        abstract_agent.AbstractAgent.__init__(self, dm_file, db_file, net_intf, cfg_file_name)
+        abstract_agent.AbstractAgent.__init__(self, dm_file, db_file, net_intf, cfg_file_name, debug)
         self._can_start = True
 
         # Initialize the underlying Agent DB MTP details for CoAP

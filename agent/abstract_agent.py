@@ -76,7 +76,7 @@ CAMERA_IMAGE_DIR = "camera.image.dir"
 
 class AbstractAgent(object):
     """An Abstract USP Agent that can be built upon for a specific binding"""
-    def __init__(self, dm_file, db_file, net_intf, cfg_file_name):
+    def __init__(self, dm_file, db_file, net_intf, cfg_file_name, debug=False):
         """Initialize the Abstract Agent"""
         self._service_map = {}
         self._periodic_handler_list = []
@@ -90,7 +90,7 @@ class AbstractAgent(object):
 
         self._load_services()
         self._msg_handler = request_handler.UspRequestHandler(self._endpoint_id, self._db,
-                                                              self._service_map)
+                                                              self._service_map, debug)
 
 
     def get_msg_handler(self):
@@ -189,7 +189,7 @@ class AbstractAgent(object):
 
     def _handle_subscription(self, subscription_path):
         """Handle a Subscription object"""
-        supported_notifs = ["Boot", "ValueChange", "Periodic"]
+        supported_notifs = ["Event", "ValueChange"]
         subscription_id = self._db.get(subscription_path + "ID")
         notif_type = self._db.get(subscription_path + "NotifType")
         controller_path = self._db.get(subscription_path + "Recipient")
@@ -202,10 +202,8 @@ class AbstractAgent(object):
                     for mtp_path in mtp_path_list:
                         controller_id = self._db.get(controller_path + "EndpointID")
 
-                        if notif_type == "Boot":
-                            self._handle_boot(controller_id, mtp_path, subscription_id)
-                        elif notif_type == "Periodic":
-                            self._handle_periodic(subscription_path, controller_id, mtp_path, subscription_id)
+                        if notif_type == "Event":
+                            self._handle_event(subscription_path, controller_id, mtp_path, subscription_id)
                         elif notif_type == "ValueChange":
                             self._handle_value_change(subscription_path, controller_id, mtp_path, subscription_id)
                 else:
@@ -232,6 +230,24 @@ class AbstractAgent(object):
                     mtp_path_list.append(mtp_path)
 
         return mtp_path_list
+
+    def _handle_event(self, subscription_path, controller_id, mtp_path, subscription_id):
+        """Handle a Subscription with an Event NotifType"""
+        supported_boot_event = "Device.Boot!"
+        supported_periodic_event = "Device.LocalAgent.Periodic!"
+        ref_list = self._db.get(subscription_path + "ReferenceList")
+        ref_event_list = ref_list.split(",")
+
+        for event_path in ref_event_list:
+            if len(event_path) > 0:
+                if event_path.strip() == supported_boot_event:
+                    self._handle_boot(controller_id, mtp_path, subscription_id)
+                elif event_path.strip() == supported_periodic_event:
+                    self._handle_periodic(subscription_path, controller_id, mtp_path, subscription_id)
+                else:
+                    self._logger.warning(
+                        "Skipping Unrecognized Reference Path [%s] in Event Subscription [%s]",
+                        event_path, subscription_id)
 
     def _handle_boot(self, controller_id, mtp_path, subscription_id):
         """Handle a Subscription for a Boot Notification"""
@@ -268,9 +284,9 @@ class AbstractAgent(object):
         ref_param_list = ref_list.split(",")
         if self._value_change_notif_poller is not None:
             for param_path in ref_param_list:
-                if len(param_path) > 0:
+                if len(param_path.strip()) > 0:
                     try:
-                        self._value_change_notif_poller.add_param(param_path, self._endpoint_id,
+                        self._value_change_notif_poller.add_param(param_path.strip(), self._endpoint_id,
                                                                   controller_id, mtp_path, subscription_id)
                         self._logger.info(
                             "Processed ValueChange Subscription [%s] for MTP [%s] on Controller [%s] - %s",
@@ -394,7 +410,7 @@ class AbstractPeriodicNotifHandler(threading.Thread):
     def run(self):
         """Thread execution code - issue a Periodic Notification every periodic_interval seconds"""
         binding_exists = True
-        periodic_interval_param_name = self._path + "PeriodicInterval"
+        periodic_interval_param_name = self._path + "PeriodicNotifInterval"
 
         while binding_exists:
             try:
