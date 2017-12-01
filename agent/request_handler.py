@@ -437,7 +437,7 @@ class UspRequestHandler(object):
         # Populate the Response's Header information
         self._populate_resp_header(req, resp, usp.Header.OPERATE_RESP)
 
-        if product_class == "RPi_Camera":
+        if product_class == "RPi_Camera" or product_class == "RPiZero_Camera":
             # Validate that the Operate.command is supported
             if command == TAKE_PICTURE_CAMERA_OP:
                 op_result = usp.OperateResp.OperationResult()
