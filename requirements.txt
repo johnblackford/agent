@@ -6,7 +6,7 @@ enum-compat==0.0.2
 netifaces==0.10.5
 nose2==0.6.5
 nose2-cov==1.0a4
-protobuf==3.5.0
+protobuf==3.5.0.post1
 six==1.10.0
 stomp.py==4.1.11
 zeroconf==0.18.0
