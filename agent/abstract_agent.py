@@ -153,7 +153,7 @@ class AbstractAgent(object):
             gpio_pin = int(cfg_mgr.get_cfg_item(GPIO_PIN))
             target_class = self._get_class(product_class, "agent.motion", "PersistDetectedMotion")
             self._service_map[product_class] = target_class(gpio_pin, self._db)
-        elif product_class == "RPi_Camera":
+        elif product_class == "RPi_Camera" or product_class == "RPiZero_Camera":
             default_cfg = {CAMERA_IMAGE_DIR: "pictures"}
             cfg_mgr = utils.ConfigMgr(self._cfg_file_name, default_cfg)
             camera_image_dir = cfg_mgr.get_cfg_item(CAMERA_IMAGE_DIR)
