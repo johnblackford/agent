@@ -442,7 +442,7 @@ class UspRequestHandler(object):
             if command == TAKE_PICTURE_CAMERA_OP:
                 op_result = usp.OperateResp.OperationResult()
                 out_arg_map = op_result.req_output_args.output_arg_map
-                camera = self._service_map["RPi_Camera"]
+                camera = self._service_map[product_class]
                 param_map = camera.take_picture()
                 for param in param_map:
                     out_arg_map[param] = param_map[param]
