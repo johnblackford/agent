@@ -24,6 +24,7 @@ logs/
 # Ignore the databases
 database/*.db
 database/*.db-orig
+database/*.db-orig-proxy
 
 # Ignore the pictures
 pictures/
