@@ -44,7 +44,6 @@ import logging
 import collections
 
 
-
 class GenericUspBinding(object):
     """A Generic USP Binding class to be used by specific protocol USP Binding classes"""
     def __init__(self, sleep_time_interval=1):
@@ -53,47 +52,47 @@ class GenericUspBinding(object):
         self._sleep_time_interval = sleep_time_interval
         self._logger = logging.getLogger(self.__class__.__name__)
 
-
-    def push(self, payload):
+    def push(self, payload, reply_to_addr):
         """Push the provided message payload onto the end of the incoming message queue"""
-        self._logger.debug("Pushing a payload onto the end of the incoming message queue")
-        self._incoming_queue.append(ExpiringQueueItem(payload))
+        self._logger.debug("Pushing a Queue Item onto the end of the incoming message queue")
+        self._incoming_queue.append(ExpiringQueueItem(payload, reply_to_addr))
 
     def pop(self):
         """Pop the next payload off of the front of the incoming message queue"""
-        payload = None
+        queue_item = None
 
         if len(self._incoming_queue) > 0:
             queue_item = self._incoming_queue.popleft()
-            if not queue_item.is_expired():
-                payload = queue_item.get_payload()
-                self._logger.debug("Popped the next payload from the front of the incoming message queue")
+            if queue_item.is_expired():
+                queue_item = None
+                self._logger.info("Popped an expired Queue Item, try again!")
             else:
-                self._logger.info("Popped an expired payload, try again!")
+                self._logger.debug("Popped the next Queue Item from the front of the incoming message queue")
 
-        return payload
+        return queue_item
 
     def get_msg(self, timeout=-1):
         """
-          Retrieve the next incoming message from the Queue
+          Retrieve the next incoming Queue Item from the Queue
             NOTE: timeout is measured in seconds
         """
-        payload = None
+        queue_item = None
         sleep_time = 0
 
         if timeout > 0:
-            while payload is None and sleep_time < timeout:
+            while queue_item is None and sleep_time < timeout:
                 time.sleep(self._sleep_time_interval)
                 sleep_time += self._sleep_time_interval
-                payload = self.pop()
+                queue_item = self.pop()
         else:
-            payload = self.pop()
+            queue_item = self.pop()
 
-        return payload
+        return queue_item
 
-    def not_my_msg(self, payload):
+    def not_my_msg(self, queue_item):
         """Retrieved the wrong message; Push the payload onto the end of the incoming message queue"""
-        self.push(payload)
+        self._logger.debug("Not my Message; Re-Pushing a Queue Item onto the end of the incoming message queue")
+        self._incoming_queue.append(queue_item)
 
     def send_msg(self, serialized_msg, to_addr):
         """Send the ProtoBuf Serialized Message to the provided address via the Protocol-specific USP Binding"""
@@ -108,14 +107,14 @@ class GenericUspBinding(object):
         raise NotImplementedError()
 
 
-
 class ExpiringQueueItem(object):
     """A Queue Item that has a TTL and a Payload"""
-    def __init__(self, payload, ttl=60):
+    def __init__(self, payload, reply_to_addr, ttl=60):
         """Initialize the ExpiringQueueItem with the payload and a TTL (default of 60 seconds)"""
         self._ttl = ttl
         self._payload = payload
         self._create_time = time.time()
+        self._reply_to_addr = reply_to_addr
         self._logger = logging.getLogger(self.__class__.__name__)
 
     def is_expired(self):
@@ -129,3 +128,7 @@ class ExpiringQueueItem(object):
     def get_payload(self):
         """Retrieve the Payload"""
         return self._payload
+
+    def get_reply_to_addr(self):
+        """Retrieve the Reply to Address"""
+        return self._reply_to_addr

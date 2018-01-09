@@ -38,13 +38,11 @@
 #
 """
 
-import base64
 import logging
 
 import stomp
 
 from agent import generic_usp_binding
-
 
 
 class MyStompConnListener(stomp.ConnectionListener):
@@ -55,7 +53,6 @@ class MyStompConnListener(stomp.ConnectionListener):
         self._debug = debug
         self._binding = binding
         self._logger = logging.getLogger(self.__class__.__name__)
-
 
     def on_error(self, headers, message):
         """STOMP Connection Listener - handle errors"""
@@ -69,20 +66,20 @@ class MyStompConnListener(stomp.ConnectionListener):
         # Validate the STOMP Headers
         if "content-type" in headers:
             self._logger.debug("Validating the STOMP Headers for 'content-type'")
-            if headers["content-type"].startswith("text/plain;base64"):
-                self._logger.debug("STOMP Message has an acceptable 'content-type'")
-                decoded_body = base64.b64decode(body)
-                self._binding.push(decoded_body)
-                self._logger.debug("Received Message payload was decoded to [%s]", decoded_body)
-            elif headers["content-type"].startswith("application/octet-stream"):
+
+            if headers["content-type"].startswith("application/vnd.bbf.usp.msg"):
                 self._logger.debug("STOMP Message has a proper 'content-type'")
-                self._binding.push(body)
+
+                if "reply-to-dest" in headers:
+                    self._logger.debug("STOMP Message has a 'reply-to-dest'")
+                    self._binding.push(body, headers["reply-to-dest"])
+                else:
+                    self._logger.warning("Incoming STOMP message had no 'reply-to-dest' header")
             else:
                 self._logger.warning("Incoming STOMP message contained an Unsupported Content-Type: %s",
                                      headers["content-type"])
         else:
             self._logger.warning("Incoming STOMP message had no Content-Type")
-
 
 
 class StompUspBinding(generic_usp_binding.GenericUspBinding):
@@ -95,6 +92,7 @@ class StompUspBinding(generic_usp_binding.GenericUspBinding):
         self._host = host
         self._port = port
         self._debug = debug
+        self._my_dest = None
         self._username = username
         self._password = password
         self._listener = MyStompConnListener(self, debug)
@@ -107,19 +105,21 @@ class StompUspBinding(generic_usp_binding.GenericUspBinding):
         self._conn.start()
         self._conn.connect(username, password, wait=True)
 
-
     def send_msg(self, serialized_msg, to_addr):
         """Send the ProtoBuf Serialized message to the provided STOMP address"""
         content_type = "application/octet-stream"
-        self._conn.send(to_addr, serialized_msg, content_type)
+        usp_headers = {"reply-to-dest": self._my_dest}
+        self._logger.debug("Using [%s] as the value of the reply-to-dest header", self._my_dest)
+        self._conn.send(to_addr, serialized_msg, content_type, usp_headers)
         self._logger.info("Sending a STOMP message to the following address: %s", to_addr)
         self._logger.debug("Payload being sent: [%s]", serialized_msg)
 
     def listen(self, endpoint_id, agent_addr):
         """Listen to a STOMP destination for incoming messages"""
         msg_id = 1
+        self._my_dest = agent_addr
 
-        #TODO: Handle the ID Better
+        # TODO: Handle the ID Better
         # Need a unique ID per destination being subscribed to
         # Need to associate a self-generated (and unique) ID to the destination
         # Need to store that destination and it's ID in a dictionary

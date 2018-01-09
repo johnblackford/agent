@@ -73,7 +73,6 @@ GPIO_PIN = "gpio.pin"
 CAMERA_IMAGE_DIR = "camera.image.dir"
 
 
-
 class AbstractAgent(object):
     """An Abstract USP Agent that can be built upon for a specific binding"""
     def __init__(self, dm_file, db_file, net_intf, cfg_file_name, debug=False):
@@ -104,7 +103,6 @@ class AbstractAgent(object):
     def set_value_change_notif_poller(self, poller):
         """Set the Value Change Notification Poller"""
         self._value_change_notif_poller = poller
-
 
     def init_subscriptions(self):
         """Initialize the Subscription Handling"""
@@ -140,7 +138,6 @@ class AbstractAgent(object):
     def clean_up(self):
         """Clean-up and prepare for shutdown"""
         raise NotImplementedError()
-
 
     def _load_services(self):
         """Load Home Automation Services Helpers"""
@@ -314,7 +311,6 @@ class AbstractAgent(object):
         raise NotImplementedError()
 
 
-
 class BindingListener(threading.Thread):
     """Listen to a specific Binding for incoming Requests"""
     def __init__(self, thread_name, binding, msg_handler, timeout=15):
@@ -328,42 +324,35 @@ class BindingListener(threading.Thread):
     def run(self):
         """Start listening for messages and process them"""
         # Listen for incoming messages
-        msg_payloads = self._receive_msgs()
-        for payload in msg_payloads:
-            if payload is not None:
-                self._handle_request(payload)
-
+        queue_items = self._receive_msgs()
+        for queue_item in queue_items:
+            if queue_item is not None:
+                self._handle_request(queue_item)
 
     def _receive_msgs(self):
         """Receive incoming messages from the binding"""
         try:
             while True:
-                payload = self._binding.get_msg(self._timeout)
-                yield payload
+                queue_item = self._binding.get_msg(self._timeout)
+                yield queue_item
         except GeneratorExit:
             self._logger.info("STOMP Binding Listener is Shutting Down as requested...")
 
-    def _handle_request(self, payload):
+    def _handle_request(self, queue_item):
         """Handle a Request/Response interaction"""
         resp = None
 
         try:
-            req, resp, serialized_resp = self._msg_handler.handle_request(payload)
+            req, resp, serialized_resp = self._msg_handler.handle_request(queue_item.get_payload())
 
-            # Send the message either to the "from" or "reply-to" contained in the request
-            #  "reply-to" is optional and overrides the "from"
-            send_to = req.header.from_id
-            if len(req.header.reply_to_id) > 0:
-                send_to = req.header.reply_to_id
-
-            to_addr = self._get_addr_from_id(send_to)
+            to_addr = queue_item.get_reply_to_addr()
             if to_addr is not None:
                 self._log_messages(req, resp, to_addr)
                 self._binding.send_msg(serialized_resp, to_addr)
             else:
                 self._logger.warning("Response not sent because an address could not be determined!")
 
-            #TODO: Check with the self._msg_handler if should shutdown, and raise a GeneratorExit
+            # TODO: Check with the self._msg_handler if should shutdown, and raise a GeneratorExit
         except request_handler.ProtocolViolationError:
             # Error already logged in the USP Protocol Tool, nothing to do
             self._logger.debug("USP Protocol Violation Encountered - dropping the Request")
@@ -402,7 +391,6 @@ class AbstractPeriodicNotifHandler(threading.Thread):
         self._logger = logging.getLogger(self.__class__.__name__)
         self._binding = None
 
-
     def set_binding(self, binding):
         """Configure the USP Binding to use when sending the Notification"""
         self._binding = binding
@@ -429,11 +417,9 @@ class AbstractPeriodicNotifHandler(threading.Thread):
 
         self._logger.warning("Periodic Notification Handler named [%s] shutting down", self.name)
 
-
     def _handle_periodic(self, notif):
         """Handle the Binding Specific Periodic Notification"""
         raise NotImplementedError()
-
 
 
 class AbstractValueChangeNotifPoller(threading.Thread):
@@ -454,7 +440,6 @@ class AbstractValueChangeNotifPoller(threading.Thread):
         self._cache_lock = threading.Lock()
         self._poll_duration = poll_duration
         self._logger = logging.getLogger(self.__class__.__name__)
-
 
     def run(self):
         """Thread execution code - poll for a value change and then
@@ -499,11 +484,9 @@ class AbstractValueChangeNotifPoller(threading.Thread):
             self._param_poll_list.remove(param)
             del self._notif_details_dict[param]
 
-
     def _handle_value_change(self, param, value, to_id, from_id, subscription_id, mtp_param_path):
         """Handle the Binding Specific Value Change Processing"""
         raise NotImplementedError()
-
 
 
 class NotificationSender(threading.Thread):
@@ -514,7 +497,6 @@ class NotificationSender(threading.Thread):
         self._to_addr = to_addr
         self._msg = notif.generate_notif_msg()
         threading.Thread.__init__(self, name="NotificationSender" + self._msg.body.request.notify.subscription_id)
-
 
     def run(self):
         """Thread execution code - send the Notification"""

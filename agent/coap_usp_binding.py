@@ -63,7 +63,6 @@ except ImportError:
     from asyncio import async as asyncio_ensure_future
 
 
-
 class MyCoapResource(aiocoap.resource.Resource):
     """A CoAP Resource for receiving USP messages"""
     def __init__(self, binding, debug=False):
@@ -72,7 +71,6 @@ class MyCoapResource(aiocoap.resource.Resource):
         self._debug = debug
         self._binding = binding
         self._logger = logging.getLogger(self.__class__.__name__)
-
 
     @asyncio.coroutine
     def render_get(self, request):
@@ -99,20 +97,29 @@ class MyCoapResource(aiocoap.resource.Resource):
         self._logger.debug("Payload received: [%s]", request.payload)
         self._logger.debug("Incoming Request opt.uri_path: [%s]", request.opt.uri_path)
         self._logger.debug("Incoming Request opt.uri_query: [%s]", request.opt.uri_query)
-        self._logger.debug("Incoming Request opt.location_path: [%s]", request.opt.location_path)
-        self._logger.debug("Incoming Request opt.location_query: [%s]", request.opt.location_query)
         self._logger.debug("Incoming Request opt.uri_host: [%s]", request.opt.uri_host)
         self._logger.debug("Incoming Request opt.uri_port: [%s]", request.opt.uri_port)
 
         if request.opt.content_format == 42:
-            if self._binding.validate_payload(request.payload):
-                self._logger.debug("Pushing the payload of the CoAP Request onto the Binding's message queue")
-                asyncio.get_event_loop().call_soon(self._binding.push, request.payload)
-                response = aiocoap.Message(code=aiocoap.Code.CHANGED)
-                self._logger.info("Responding to the CoAP Request with a 2.04 Status Code")
+            self._logger.debug("Incoming CoAP POST Request Content-Format Validated")
+
+            reply_to_addr = self._binding.validate_uri_query(request.opt.uri_query)
+            if reply_to_addr is not None:
+                self._logger.debug("Incoming CoAP POST Request URI-Query Validated")
+
+                if self._binding.validate_payload(request.payload):
+                    self._logger.debug("Incoming CoAP POST Request Payload Validated")
+                    asyncio.get_event_loop().call_soon(self._binding.push, request.payload, reply_to_addr)
+                    response = aiocoap.Message(code=aiocoap.Code.CHANGED)
+                    self._logger.info("Responding to the CoAP Request with a 2.04 Status Code")
+                else:
+                    # Failed Payload Validation, respond with 4.00
+                    self._logger.warning("The payload of the Incoming CoAP Request failed the Binding's validation")
+                    response = aiocoap.Message(code=aiocoap.Code.BAD_REQUEST)
+                    self._logger.info("Responding to the CoAP Request with a 4.00 Status Code")
             else:
-                # Failed Payload Validation, respond with 4.00
-                self._logger.warning("The payload of the Incoming CoAP Request failed the Binding's validation")
+                # Failed 'reply-to' URI-Query Validation, respond with 4.00
+                self._logger.warning("The 'reply-to' address on the Incoming CoAP Request is missing")
                 response = aiocoap.Message(code=aiocoap.Code.BAD_REQUEST)
                 self._logger.info("Responding to the CoAP Request with a 4.00 Status Code")
         else:
@@ -121,7 +128,8 @@ class MyCoapResource(aiocoap.resource.Resource):
             response = aiocoap.Message(code=aiocoap.Code.UNSUPPORTED_MEDIA_TYPE)
             self._logger.info("Responding to the CoAP Request with a 4.15 Status Code")
 
-        response.opt.content_format = 42  ### Per CoAP this is application/octet-stream
+        # Per CoAP this is application/octet-stream
+        response.opt.content_format = 42
 
         return response
 
@@ -135,7 +143,6 @@ class MyCoapResource(aiocoap.resource.Resource):
         return link
 
 
-
 class CoapReceivingThread(threading.Thread):
     """A Thread that executes the AsyncIO Event Loop Processing to receive CoAP messages"""
     def __init__(self, resource_tree, listening_port, debug=False):
@@ -145,7 +152,6 @@ class CoapReceivingThread(threading.Thread):
         self._resource_tree = resource_tree
         self._listening_port = listening_port
         self._logger = logging.getLogger(self.__class__.__name__)
-
 
     def run(self):
         """Listen for incoming CoAP messages for the Resources provided"""
@@ -166,10 +172,9 @@ class CoapReceivingThread(threading.Thread):
         my_event_loop.close()
 
 
-
 class CoapSendingThread(threading.Thread):
     """A Thread that executes the AsyncIO Event Loop Processing to send a single CoAP message"""
-    def __init__(self, serialized_msg, to_addr, debug=False):
+    def __init__(self, my_addr, serialized_msg, to_addr, debug=False):
         """Initialize the CoAP Sending Thread"""
         threading.Thread.__init__(self, name="CoAP Sending Thread - " + to_addr)
         self._debug = debug
@@ -177,6 +182,8 @@ class CoapSendingThread(threading.Thread):
         self._serialized_msg = serialized_msg
         self._logger = logging.getLogger(self.__class__.__name__)
 
+        self._reply_to = my_addr.split("://")[1]
+        self._logger.debug("Using [%s] as the value of the reply-to URI Query Option", self._reply_to)
 
     def run(self):
         """Send an outgoing CoAP message to the specified CoAP Address"""
@@ -188,13 +195,13 @@ class CoapSendingThread(threading.Thread):
         my_event_loop.run_until_complete(self._issue_request(self._to_addr, self._serialized_msg))
         my_event_loop.close()
 
-
     @asyncio.coroutine
     def _issue_request(self, to_addr, serialized_msg):
         """Send a ProtoBuf Serialized USP Message to the specified CoAP URL via the POST Method"""
         msg = aiocoap.Message(code=aiocoap.Code.POST, payload=serialized_msg)
-        msg.opt.content_format = 42  ### Per CoAP this is application/octet-stream
-        msg.set_request_uri(to_addr)
+        # Per CoAP this is application/octet-stream
+        msg.opt.content_format = 42
+        msg.set_request_uri(to_addr + "?reply-to=" + self._reply_to)
 
         self._logger.debug("Creating a CoAP Client Context")
         context = yield from aiocoap.Context.create_client_context()
@@ -208,10 +215,9 @@ class CoapSendingThread(threading.Thread):
             self._logger.warning("CoAP Message Sent, but no Response received due to a Timeout Error")
 
 
-
 class CoapUspBinding(generic_usp_binding.GenericUspBinding):
     """A COAP to USP Binding"""
-    def __init__(self, listen_port=5683, sending_thr_timeout=5, resource_path='usp', debug=False):
+    def __init__(self, my_ip, listen_port=5683, sending_thr_timeout=5, resource_path='usp', debug=False):
         """Initialize the CoAP USP Binding for a USP Endpoint
             - 5683 is the default CoAP port, but 5684 is the default CoAPS port"""
         generic_usp_binding.GenericUspBinding.__init__(self)
@@ -222,7 +228,21 @@ class CoapUspBinding(generic_usp_binding.GenericUspBinding):
         self._sending_thr_timeout = sending_thr_timeout
         self._resource = MyCoapResource(self, self._debug)
         self._logger = logging.getLogger(self.__class__.__name__)
+        self._my_addr = "coap://" + my_ip + ":" + str(listen_port) + "/" + resource_path
 
+    def validate_uri_query(self, uri_query):
+        """Validate the URI-Query of the incoming CoAP message to retreive the reply-to address"""
+        reply_to_addr = None
+
+        for query_item in uri_query:
+            self._logger.debug("Processing URI-Query Item: %s", query_item)
+            query_item_parts = query_item.split("=")
+
+            if query_item_parts[0] == "reply-to":
+                reply_to_addr = "coap://" + query_item_parts[1]
+                self._logger.debug("Found 'reply-to' URI Query; value altered to: %s", reply_to_addr)
+
+        return reply_to_addr
 
     def validate_payload(self, payload):
         """Validate the payload of the Incoming CoAP message to ensure it is properly formed"""
@@ -232,7 +252,7 @@ class CoapUspBinding(generic_usp_binding.GenericUspBinding):
     def send_msg(self, serialized_msg, to_addr):
         """Send the ProtoBuf Serialized message to the provided CoAP address"""
         self._logger.info("Starting a CoAP Sending Thread")
-        coap_send_thr = CoapSendingThread(serialized_msg, to_addr, self._debug)
+        coap_send_thr = CoapSendingThread(self._my_addr, serialized_msg, to_addr, self._debug)
         coap_send_thr.start()
         coap_send_thr.join(self._sending_thr_timeout)
 
