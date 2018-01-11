@@ -88,6 +88,8 @@ class PersistRecordedImage(RecordImage):
     """Persist the recorded images to the Agent Database"""
     IP_ADDR = "Device.LocalAgent.X_ARRIS-COM_IPAddr"
     PIC_TABLE = "Device.Services.HomeAutomation.1.Camera.1.Pic."
+    MAX_NUM_PICS = "Device.Services.HomeAutomation.1.Camera.1.MaxNumberOfPics"
+    PIC_NUM_ENTRIES = "Device.Services.HomeAutomation.1.Camera.1.PicNumberOfEntries"
 
     def __init__(self, directory, filename_prefix, agent_db, port="8080"):
         RecordImage.__init__(self, directory, filename_prefix)
@@ -99,13 +101,25 @@ class PersistRecordedImage(RecordImage):
     def take_picture(self):
         param_map = {}
         agent_ip = self._db.get(self.IP_ADDR)
+        max_pics = self._db.get(self.MAX_NUM_PICS)
+        starting_pic_num_entries = self._db.get(self.PIC_NUM_ENTRIES)
         pic_list = RecordImage.take_picture(self)
-        #TODO: Check number of pics in table, remove enough pics to add the list
-        ### the concern here is that while we can clean up the Agent here, the
-        ###  controller might have done something with those results
 
         for pic in pic_list:
             inst_num = self._db.insert(self.PIC_TABLE)
+
+            # Auto-remove old instances to maintain the max table size
+            if (inst_num - max_pics) > 0:
+                oldest_inst_num_to_del = inst_num - max_pics
+                pic_inst_num_to_del = inst_num - starting_pic_num_entries
+
+                while pic_inst_num_to_del <= oldest_inst_num_to_del:
+                    old_pic_path = self.PIC_TABLE + str(pic_inst_num_to_del) + "."
+                    self._db.delete(old_pic_path)
+                    self._logger.info("Removing picture instance [%s] from the DB", old_pic_path)
+                    pic_inst_num_to_del += 1
+
+            # Update the URL of the new instance
             pic_url = "http://" + agent_ip + ":" + self._port + "/camera/" + pic
             url_param_path = self.PIC_TABLE + str(inst_num) + ".URL"
             self._db.update(url_param_path, pic_url)
