@@ -107,7 +107,7 @@ class StompUspBinding(generic_usp_binding.GenericUspBinding):
 
     def send_msg(self, serialized_msg, to_addr):
         """Send the ProtoBuf Serialized message to the provided STOMP address"""
-        content_type = "application/octet-stream"
+        content_type = "application/vnd.bbf.usp.msg"
         usp_headers = {"reply-to-dest": self._my_dest}
         self._logger.debug("Using [%s] as the value of the reply-to-dest header", self._my_dest)
         self._conn.send(to_addr, serialized_msg, content_type, usp_headers)
