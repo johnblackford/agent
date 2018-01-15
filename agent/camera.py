@@ -101,12 +101,12 @@ class PersistRecordedImage(RecordImage):
     def take_picture(self):
         param_map = {}
         agent_ip = self._db.get(self.IP_ADDR)
-        max_pics = self._db.get(self.MAX_NUM_PICS)
-        starting_pic_num_entries = self._db.get(self.PIC_NUM_ENTRIES)
         pic_list = RecordImage.take_picture(self)
 
         for pic in pic_list:
             inst_num = self._db.insert(self.PIC_TABLE)
+            max_pics = self._db.get(self.MAX_NUM_PICS)
+            starting_pic_num_entries = self._db.get(self.PIC_NUM_ENTRIES)
 
             # Auto-remove old instances to maintain the max table size
             if (inst_num - max_pics) > 0:
@@ -118,6 +118,7 @@ class PersistRecordedImage(RecordImage):
                     self._db.delete(old_pic_path)
                     self._logger.info("Removing picture instance [%s] from the DB", old_pic_path)
                     pic_inst_num_to_del += 1
+                    # TODO - what about removing the file too?
 
             # Update the URL of the new instance
             pic_url = "http://" + agent_ip + ":" + self._port + "/camera/" + pic
