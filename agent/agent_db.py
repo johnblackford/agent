@@ -286,6 +286,7 @@ class Database(object):
         # Validate that path is in the Implemented Data Model
         for dm_key in self._dm:
             if re.fullmatch(dm_regex_str, dm_key) is not None:
+                logger.debug("find_impl_objects: Found full match: %s", dm_key)
                 found_key = None
                 key_parts = dm_key.split(".")
                 key_parts_len = len(key_parts)
