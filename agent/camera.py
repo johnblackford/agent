@@ -105,8 +105,8 @@ class PersistRecordedImage(RecordImage):
         pic_list = RecordImage.take_picture(self)
 
         for pic in pic_list:
-            inst_num = self._db.insert(self.PIC_TABLE)
             starting_pic_num_entries = self._db.get(self.PIC_NUM_ENTRIES)
+            inst_num = self._db.insert(self.PIC_TABLE)
             self._logger.info("Inserting picture instance [%s] into the DB", str(inst_num))
 
             # Auto-remove old instances to maintain the max table size
