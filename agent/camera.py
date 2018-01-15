@@ -101,12 +101,13 @@ class PersistRecordedImage(RecordImage):
     def take_picture(self):
         param_map = {}
         agent_ip = self._db.get(self.IP_ADDR)
+        max_pics = self._db.get(self.MAX_NUM_PICS)
         pic_list = RecordImage.take_picture(self)
 
         for pic in pic_list:
             inst_num = self._db.insert(self.PIC_TABLE)
-            max_pics = self._db.get(self.MAX_NUM_PICS)
             starting_pic_num_entries = self._db.get(self.PIC_NUM_ENTRIES)
+            self._logger.info("Inserting picture instance [%s] into the DB", str(inst_num))
 
             # Auto-remove old instances to maintain the max table size
             if (inst_num - max_pics) > 0:
@@ -124,7 +125,7 @@ class PersistRecordedImage(RecordImage):
             pic_url = "http://" + agent_ip + ":" + self._port + "/camera/" + pic
             url_param_path = self.PIC_TABLE + str(inst_num) + ".URL"
             self._db.update(url_param_path, pic_url)
-            self._logger.info("Inserting picture [%s] into the DB at [%s]", pic_url, url_param_path)
+            self._logger.info("Updating the picture [%s] in the DB at [%s]", pic_url, url_param_path)
             param_map[url_param_path] = pic_url
 
         return param_map
