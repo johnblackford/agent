@@ -330,7 +330,7 @@ class Database(object):
         if len(self.find_impl_objects(partial_path, True)) > 0:
             dm_regex_str = partial_path
             dm_regex_str = re.sub(r'\{(.+?)\}', '{i}', dm_regex_str)
-            dm_regex_str = re.sub(r'\.\d\.', '.{i}.', dm_regex_str)
+            dm_regex_str = re.sub(r'\.\d+\.', '.{i}.', dm_regex_str)
             logger.debug("insert: Using regex \"%s\" to validate Path [%s] is in the Supported Insert Path List",
                          dm_regex_str, partial_path)
 
@@ -359,7 +359,7 @@ class Database(object):
         if len(self.find_impl_objects(partial_path, True)) > 0:
             dm_regex_str = partial_path
             dm_regex_str = re.sub(r'\{(.+?)\}', '{i}', dm_regex_str)
-            dm_regex_str = re.sub(r'\.\d\.', '.{i}.', dm_regex_str)
+            dm_regex_str = re.sub(r'\.\d+\.', '.{i}.', dm_regex_str)
             logger.debug("delete: Using regex \"%s\" to validate Path [%s] is in the Supported Insert Path List",
                          dm_regex_str, partial_path)
 
