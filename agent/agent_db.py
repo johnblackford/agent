@@ -304,6 +304,8 @@ class Database(object):
                         found_key += "."
                         inx += 1
 
+                logger.debug("find_impl_objects: Found key: %s", found_key)
+
                 # Only add it to found_keys if we haven't done so already
                 if found_key is not None:
                     if found_key not in found_keys:
