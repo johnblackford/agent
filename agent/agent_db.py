@@ -296,6 +296,9 @@ class Database(object):
                     if key_parts_len > partial_path_part_len + 1:
                         built_path = utils.PathHelper.build_path_from_parts(key_parts, partial_path_part_len)
                         found_key = built_path + key_parts[partial_path_part_len] + "."
+                    else:
+                        logger.debug("find_impl_objects: key parts [%s] greater than partial path parts [%s]",
+                                     str(key_parts_len), str(partial_path_part_len + 1))
                 else:
                     inx = 0
                     found_key = ""
@@ -304,13 +307,14 @@ class Database(object):
                         found_key += "."
                         inx += 1
 
-                logger.debug("find_impl_objects: Found key: %s", found_key)
-
                 # Only add it to found_keys if we haven't done so already
                 if found_key is not None:
+                    logger.debug("find_impl_objects: Found key: %s", found_key)
                     if found_key not in found_keys:
+                        logger.debug("find_impl_objects: Found key [%s] not already in the list", found_key)
                         # Don't add the incoming partial_path
                         if not found_key == generic_partial_path:
+                            logger.debug("find_impl_objects: Adding found key [%s] to the list", found_key)
                             found_keys.append(found_key)
 
         # If the path is Valid then retrieve the matching paths
