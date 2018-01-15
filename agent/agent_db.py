@@ -293,11 +293,11 @@ class Database(object):
                 is_implemented_path = True
 
                 if next_level:
-                    if key_parts_len > partial_path_part_len + 1:
+                    if key_parts_len >= partial_path_part_len + 1:
                         built_path = utils.PathHelper.build_path_from_parts(key_parts, partial_path_part_len)
                         found_key = built_path + key_parts[partial_path_part_len] + "."
                     else:
-                        logger.debug("find_impl_objects: key parts [%s] greater than partial path parts [%s]",
+                        logger.debug("find_impl_objects: key parts [%s] less than partial path parts [%s]",
                                      str(key_parts_len), str(partial_path_part_len + 1))
                 else:
                     inx = 0
