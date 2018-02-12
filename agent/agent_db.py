@@ -293,7 +293,7 @@ class Database(object):
                 is_implemented_path = True
 
                 if next_level:
-                    if key_parts_len >= partial_path_part_len + 1:
+                    if key_parts_len > partial_path_part_len + 1:
                         built_path = utils.PathHelper.build_path_from_parts(key_parts, partial_path_part_len)
                         found_key = built_path + key_parts[partial_path_part_len] + "."
                     else:
@@ -356,11 +356,11 @@ class Database(object):
         """Remove an existing record from the table"""
         logger = logging.getLogger(self.__class__.__name__)
 
-        if len(self.find_impl_objects(partial_path, True)) > 0:
+        if len(self.find_objects(partial_path)) > 0:
             dm_regex_str = partial_path
             dm_regex_str = re.sub(r'\{(.+?)\}', '{i}', dm_regex_str)
             dm_regex_str = re.sub(r'\.\d+\.', '.{i}.', dm_regex_str)
-            logger.debug("delete: Using regex \"%s\" to validate Path [%s] is in the Supported Insert Path List",
+            logger.debug("delete: Using regex \"%s\" to validate Path [%s] is in the Supported Delete Path List",
                          dm_regex_str, partial_path)
 
             if dm_regex_str in self._supported_delete_path_list:
