@@ -681,15 +681,18 @@ def test_find_impl_objects_static_table_next_level():
 
     with mock.patch("builtins.open", my_mock):
         my_db = agent_db.Database("mock_dm.json", "mock_db.json", "intf")
-        found_objects_list1 = my_db.find_impl_objects("Device.Controller.{i}.", True)
-        found_objects_list2 = my_db.find_impl_objects("Device.Services.", True)
+        found_objects_list1 = my_db.find_impl_objects("Device.Controller.", True)
+        found_objects_list2 = my_db.find_impl_objects("Device.Controller.{i}.", True)
+        found_objects_list3 = my_db.find_impl_objects("Device.Services.", True)
 
-    assert len(found_objects_list1) == 2
-    assert "Device.Controller.{i}.CoAP." in found_objects_list1
-    assert "Device.Controller.{i}.STOMP." in found_objects_list1
-    assert len(found_objects_list2) == 1
-    assert "Device.Services.HomeAutomation." in found_objects_list2
-#    assert "Device.Services.HomeAutomation.{i}." in found_objects_list2
+    assert len(found_objects_list1) == 1
+    assert "Device.Controller.{i}." in found_objects_list1
+    assert len(found_objects_list2) == 2
+    assert "Device.Controller.{i}.CoAP." in found_objects_list2
+    assert "Device.Controller.{i}.STOMP." in found_objects_list2
+    assert len(found_objects_list3) == 1
+    assert "Device.Services.HomeAutomation." in found_objects_list3
+#    assert "Device.Services.HomeAutomation.{i}." in found_objects_list3
 
 
 def test_find_impl_objects_instance_number_addressing():
@@ -721,12 +724,14 @@ def test_find_impl_objects_instance_number_addressing_next_level():
         my_db = agent_db.Database("mock_dm.json", "mock_db.json", "intf")
         found_objects_list1 = my_db.find_impl_objects("Device.Controller.2.", True)
         found_objects_list2 = my_db.find_impl_objects("Device.Services.HomeAutomation.1.", True)
+        found_objects_list3 = my_db.find_impl_objects("Device.Services.HomeAutomation.1.Camera.1.Pic.1.", True)
 
     assert len(found_objects_list1) == 2
     assert "Device.Controller.{i}.CoAP." in found_objects_list1
     assert "Device.Controller.{i}.STOMP." in found_objects_list1
     assert len(found_objects_list2) == 1
     assert "Device.Services.HomeAutomation.{i}.Camera." in found_objects_list2
+    assert len(found_objects_list3) == 0
 
 
 def test_find_impl_objects_instance_number_addressing_no_instance():
@@ -955,3 +960,49 @@ def test_update_no_such_path():
  Tests for delete
    NOTE: Mocking the _save method
 """
+
+
+def test_delete_instance():
+    file_mock = dm_mock = mock.mock_open(read_data=get_dm_file_contents())
+    db_mock = mock.mock_open(read_data=get_db_file_contents())
+    file_mock.side_effect = [dm_mock.return_value, db_mock.return_value]
+
+    with mock.patch("builtins.open", file_mock):
+        with mock.patch.object(agent_db.Database, '_save') as save_mock:
+            my_db = agent_db.Database("mock_dm.json", "mock_db.json", "intf")
+            my_db.delete("Device.Services.HomeAutomation.1.Camera.2.Pic.100.")
+
+    save_mock.assert_called_once_with()
+
+
+def test_delete_instance_no_such_path():
+    file_mock = dm_mock = mock.mock_open(read_data=get_dm_file_contents())
+    db_mock = mock.mock_open(read_data=get_db_file_contents())
+    file_mock.side_effect = [dm_mock.return_value, db_mock.return_value]
+
+    with mock.patch("builtins.open", file_mock):
+        my_db = agent_db.Database("mock_dm.json", "mock_db.json", "intf")
+        my_db._save = mock.MagicMock()
+
+        try:
+            my_db.delete("Device.NoSuchPath.1.")
+            assert False, "NoSuchPathError Expected"
+        except agent_db.NoSuchPathError:
+            pass
+
+
+def test_delete_instance_no_such_instance():
+    file_mock = dm_mock = mock.mock_open(read_data=get_dm_file_contents())
+    db_mock = mock.mock_open(read_data=get_db_file_contents())
+    file_mock.side_effect = [dm_mock.return_value, db_mock.return_value]
+
+    with mock.patch("builtins.open", file_mock):
+        my_db = agent_db.Database("mock_dm.json", "mock_db.json", "intf")
+        my_db._save = mock.MagicMock()
+
+        try:
+            my_db.delete("Device.Services.HomeAutomation.1.Camera.2.Pic.999.")
+            my_db.delete("Device.NoSuchPath.1.")
+            assert False, "NoSuchPathError Expected"
+        except agent_db.NoSuchPathError:
+            pass
