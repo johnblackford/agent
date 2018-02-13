@@ -205,7 +205,7 @@ class StompAgent(abstract_agent.AbstractAgent):
         self._db.update(stomp_conn_ref + "LastChangeDate", utils.TimeHelper.get_time_as_str(time.time(), timezone))
         self._logger.info("Connecting to %s", stomp_conn_ref)
 
-        binding = stomp_usp_binding.StompUspBinding(host, port, username, password, virtual_host,
+        binding = stomp_usp_binding.StompUspBinding(self._endpoint_id, host, port, username, password, virtual_host,
                                                     outgoing_heartbeats, incoming_heartbeats)
 
         # Set the STOMP Connection Status to Enabled
@@ -214,7 +214,7 @@ class StompAgent(abstract_agent.AbstractAgent):
         self._logger.info("Connected to %s", stomp_conn_ref)
 
         # Start listening
-        binding.listen(self._endpoint_id, listen_dest)
+        binding.listen(listen_dest)
 
         # Save the binding, and configure the ValueChangeNotifPoller
         self._binding_dict[stomp_conn_ref] = binding

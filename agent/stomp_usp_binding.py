@@ -52,11 +52,25 @@ class MyStompConnListener(stomp.ConnectionListener):
         stomp.ConnectionListener.__init__(self)
         self._debug = debug
         self._binding = binding
+        self._subscribe_dest = None
         self._logger = logging.getLogger(self.__class__.__name__)
+
+    def get_subscribe_dest(self):
+        """Retreive the current value of the internal subscribe_dest value"""
+        return self._subscribe_dest
 
     def on_error(self, headers, message):
         """STOMP Connection Listener - handle errors"""
         self._logger.error("Received an error [%s]", message)
+
+    def on_connected(self, headers, body):
+        """STOMP Connection Listener - received CONNECTED frame; look for subscribe-dest header"""
+        if "subscribe-dest" in headers:
+            self._subscribe_dest = headers["subscribe-dest"]
+            self._logger.info("Found 'subscribe-dest' in the headers of the CONNECTED frame with a value of: %s",
+                              self._subscribe_dest)
+        else:
+            self._logger.debug("The 'subscribe-dest' header was NOT found in the CONNECTED frame")
 
     def on_message(self, headers, body):
         """STOMP Connection Listener - record messages to the incoming queue"""
@@ -84,8 +98,8 @@ class MyStompConnListener(stomp.ConnectionListener):
 
 class StompUspBinding(generic_usp_binding.GenericUspBinding):
     """A STOMP to USP Binding"""
-    def __init__(self, host="127.0.0.1", port=61613, username="admin", password="admin", virtual_host="/",
-                 outgoing_heartbeats=0, incoming_heartbeats=0, debug=False):
+    def __init__(self, my_endpoint_id, host="127.0.0.1", port=61613, username="admin", password="admin",
+                 virtual_host="/", outgoing_heartbeats=0, incoming_heartbeats=0, debug=False):
         """Initialize the STOMP USP Binding for a USP Endpoint
             - 61613 is the default STOMP port for RabbitMQ installations"""
         generic_usp_binding.GenericUspBinding.__init__(self)
@@ -95,6 +109,7 @@ class StompUspBinding(generic_usp_binding.GenericUspBinding):
         self._my_dest = None
         self._username = username
         self._password = password
+        self._my_endpoint_id = my_endpoint_id
         self._listener = MyStompConnListener(self, debug)
         self._logger = logging.getLogger(self.__class__.__name__)
 
@@ -103,7 +118,7 @@ class StompUspBinding(generic_usp_binding.GenericUspBinding):
                                         vhost=virtual_host, auto_decode=False)
         self._conn.set_listener("defaultListener", self._listener)
         self._conn.start()
-        self._conn.connect(username, password, wait=True)
+        self._conn.connect(username, password, wait=True, headers={"endpoint-id": self._my_endpoint_id})
 
     def send_msg(self, serialized_msg, to_addr):
         """Send the ProtoBuf Serialized message to the provided STOMP address"""
@@ -114,10 +129,16 @@ class StompUspBinding(generic_usp_binding.GenericUspBinding):
         self._logger.info("Sending a STOMP message to the following address: %s", to_addr)
         self._logger.debug("Payload being sent: [%s]", serialized_msg)
 
-    def listen(self, endpoint_id, agent_addr):
+    def listen(self, agent_addr):
         """Listen to a STOMP destination for incoming messages"""
         msg_id = 1
-        self._my_dest = agent_addr
+
+        self._my_dest = self._listener.get_subscribe_dest()
+        if self._my_dest is None:
+            self._my_dest = agent_addr
+            self._logger.info("Using Destination [%s] as retrieved from the data model", self._my_dest)
+        else:
+            self._logger.info("Using Destination [%s] as discovered in the CONNECTED frame headers", self._my_dest)
 
         # TODO: Handle the ID Better
         # Need a unique ID per destination being subscribed to

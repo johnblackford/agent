@@ -217,7 +217,8 @@ class CoapSendingThread(threading.Thread):
 
 class CoapUspBinding(generic_usp_binding.GenericUspBinding):
     """A COAP to USP Binding"""
-    def __init__(self, my_ip, listen_port=5683, sending_thr_timeout=5, resource_path='usp', debug=False):
+    def __init__(self, my_ip, my_endpoint_id, listen_port=5683, sending_thr_timeout=5, resource_path='usp',
+                 debug=False):
         """Initialize the CoAP USP Binding for a USP Endpoint
             - 5683 is the default CoAP port, but 5684 is the default CoAPS port"""
         generic_usp_binding.GenericUspBinding.__init__(self)
@@ -225,6 +226,7 @@ class CoapUspBinding(generic_usp_binding.GenericUspBinding):
         self._listen_thread = None
         self._listen_port = listen_port
         self._resource_path = resource_path
+        self._my_endpoint_id = my_endpoint_id
         self._sending_thr_timeout = sending_thr_timeout
         self._resource = MyCoapResource(self, self._debug)
         self._logger = logging.getLogger(self.__class__.__name__)
@@ -256,10 +258,10 @@ class CoapUspBinding(generic_usp_binding.GenericUspBinding):
         coap_send_thr.start()
         coap_send_thr.join(self._sending_thr_timeout)
 
-    def listen(self, endpoint_id, agent_addr):
+    def listen(self, agent_addr):
         """Listen for incoming CoAP messages"""
         # Agent Initialization - Create a Server Resource Tree for the USP Agent
-        self._logger.debug("Creating a CoAP Server Resource Tree for USP Endpoint: %s", endpoint_id)
+        self._logger.debug("Creating a CoAP Server Resource Tree for USP Endpoint: %s", self._my_endpoint_id)
         resource_tree = aiocoap.resource.Site()
         resource_tree.add_resource(('.well-known', 'core'),
                                    aiocoap.resource.WKCResource(resource_tree.get_resources_as_linkheader))

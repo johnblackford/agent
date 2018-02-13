@@ -64,9 +64,9 @@ class CoapAgent(abstract_agent.AbstractAgent):
 
             # We only support 1 Local Agent CoAP MTP
             if num_local_agent_coap_mtps == 1:
-                self._binding = coap_usp_binding.CoapUspBinding(ip_addr, port, resource_path=resource_path,
-                                                                debug=debug)
-                self._binding.listen(self._endpoint_id, url)
+                self._binding = coap_usp_binding.CoapUspBinding(ip_addr, self._endpoint_id, port,
+                                                                resource_path=resource_path, debug=debug)
+                self._binding.listen(url)
 
                 self._mdns_announcer = mdns.Announcer(ip_addr, port, resource_path, self._endpoint_id)
                 self._mdns_announcer.announce(self._get_friendly_name(), self._get_subtypes())
