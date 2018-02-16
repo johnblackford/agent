@@ -91,7 +91,6 @@ class AbstractAgent(object):
         self._msg_handler = request_handler.UspRequestHandler(self._endpoint_id, self._db,
                                                               self._service_map, debug)
 
-
     def get_msg_handler(self):
         """Retrieve the Internal Message Handler"""
         return self._msg_handler
@@ -340,15 +339,16 @@ class BindingListener(threading.Thread):
 
     def _handle_request(self, queue_item):
         """Handle a Request/Response interaction"""
-        resp = None
+        resp_msg = None
 
         try:
-            req, resp, serialized_resp = self._msg_handler.handle_request(queue_item.get_payload())
+            req_msg, req_record, resp_msg, serialized_resp_record = \
+                self._msg_handler.handle_request(queue_item.get_payload())
 
             to_addr = queue_item.get_reply_to_addr()
             if to_addr is not None:
-                self._log_messages(req, resp, to_addr)
-                self._binding.send_msg(serialized_resp, to_addr)
+                self._log_messages(req_msg, req_record, resp_msg, to_addr)
+                self._binding.send_msg(serialized_resp_record, to_addr)
             else:
                 self._logger.warning("Response not sent because an address could not be determined!")
 
@@ -357,17 +357,17 @@ class BindingListener(threading.Thread):
             # Error already logged in the USP Protocol Tool, nothing to do
             self._logger.debug("USP Protocol Violation Encountered - dropping the Request")
 
-        return resp
+        return resp_msg
 
-    def _log_messages(self, req, resp, to_addr):
+    def _log_messages(self, req_msg, req_record, resp_msg, to_addr):
         """Logging Helper Static Method"""
         self._logger.info("Handled a [%s] Request from Endpoint ID [%s]",
-                          req.body.request.WhichOneof("req_type"), req.header.from_id)
+                          req_msg.body.request.WhichOneof("req_type"), req_record.from_id)
 
-        if resp.body.HasField("response"):
+        if resp_msg.body.HasField("response"):
             self._logger.info("Sending a [%s] Response to Endpoint Address [%s]",
-                              resp.body.response.WhichOneof("resp_type"), to_addr)
-        elif resp.body.HasField("error"):
+                              resp_msg.body.response.WhichOneof("resp_type"), to_addr)
+        elif resp_msg.body.HasField("error"):
             self._logger.info("Responding with an Error to Endpoint Address [%s]", to_addr)
         else:
             self._logger.warning("Sending an Unknown Response")
@@ -409,7 +409,8 @@ class AbstractPeriodicNotifHandler(threading.Thread):
                 self._logger.info("Sending a Periodic Notification to %s", self._to_id)
                 notif = notify.PeriodicNotification(self._from_id, self._to_id,
                                                     self._subscription_id, self._path)
-                binding_exists = self._handle_periodic(notif)
+                notif_record = notif.wrap_notif_in_record(notif.generate_notif_msg())
+                binding_exists = self._handle_periodic_record(notif_record)
             except agent_db.NoSuchPathError:
                 binding_exists = False
                 self._logger.warning("Periodic Notification Failure : No Periodic Interval [%s]",
@@ -417,7 +418,7 @@ class AbstractPeriodicNotifHandler(threading.Thread):
 
         self._logger.warning("Periodic Notification Handler named [%s] shutting down", self.name)
 
-    def _handle_periodic(self, notif):
+    def _handle_periodic_record(self, notif_record):
         """Handle the Binding Specific Periodic Notification"""
         raise NotImplementedError()
 
@@ -495,9 +496,11 @@ class NotificationSender(threading.Thread):
         """Initialize the Notification Sender"""
         self._binding = binding
         self._to_addr = to_addr
-        self._msg = notif.generate_notif_msg()
-        threading.Thread.__init__(self, name="NotificationSender" + self._msg.body.request.notify.subscription_id)
+        self._notif_msg = notif.generate_notif_msg()
+        self._subscription_id = self._notif_msg.body.request.notify.subscription_id
+        self._notif_record = notif.wrap_notif_in_record(self._notif_msg)
+        threading.Thread.__init__(self, name="NotificationSender" + self._subscription_id)
 
     def run(self):
         """Thread execution code - send the Notification"""
-        self._binding.send_msg(self._msg.SerializeToString(), self._to_addr)
+        self._binding.send_msg(self._notif_record.SerializeToString(), self._to_addr)

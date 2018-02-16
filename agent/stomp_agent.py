@@ -129,19 +129,21 @@ class StompAgent(abstract_agent.AbstractAgent):
 
                 if protocol == self._get_supported_protocol():
                     if controller_stomp_dest is None:
+                        controller_alias = self._db.get(mtp_path + "Alias")
                         controller_stomp_dest = self._db.get(mtp_path + "STOMP.Destination")
                         controller_stomp_conn = self._db.get(mtp_path + "STOMP.Reference") + "."
 
                         if controller_stomp_conn not in self._controller_stomp_conn_ref_dict:
                             self._controller_stomp_conn_ref_dict[controller_stomp_conn] = {}
 
-                        self._logger.info("Found STOMP Controller [%s] on Server [%s] and Destination [%s]",
-                                          controller_id, controller_stomp_conn, controller_stomp_dest)
+                        self._logger.info(
+                            "Found STOMP Controller [%s], Endpoint ID [%s], on Server [%s] and Destination [%s]",
+                            controller_alias, controller_id, controller_stomp_conn, controller_stomp_dest)
                         self._controller_stomp_conn_ref_dict[controller_stomp_conn][controller_id] = \
                             controller_stomp_dest
                     else:
                         self._logger.warning(
-                            "Skipping MTP [%s] on controller [%s] - STOMP Destination already found",
+                            "Skipping MTP [%s] on controller [%s] - STOMP Destination is Empty",
                             mtp_alias, controller_id
                         )
                 else:
@@ -242,10 +244,10 @@ class StompAgent(abstract_agent.AbstractAgent):
     def _get_notification_sender(self, notif, controller_id, mtp_param_path):
         """Return an instance of a binding specific AbstractNotificationSender"""
         notif_sender = None
+        to_addr = self._db.get(mtp_param_path + "STOMP.Destination")
         controller_stomp_conn = self._db.get(mtp_param_path + "STOMP.Reference") + "."
 
         if controller_stomp_conn in self._binding_dict:
-            to_addr = "/queue/" + controller_id
             binding = self._binding_dict[controller_stomp_conn]
             notif_sender = abstract_agent.NotificationSender(notif, binding, to_addr)
         else:
@@ -308,7 +310,7 @@ class StompPeriodicNotifHandler(abstract_agent.AbstractPeriodicNotifHandler):
         self._controller_dest_dict = controller_dest_dict
 
 
-    def _handle_periodic(self, notif):
+    def _handle_periodic_record(self, notif_record):
         """Handle the STOMP Periodic Notification"""
         binding_exists = True
 
@@ -316,11 +318,10 @@ class StompPeriodicNotifHandler(abstract_agent.AbstractPeriodicNotifHandler):
             # Ensure the Controller Endpoint ID is known
             if self._to_id in self._controller_dest_dict:
                 to_addr = self._controller_dest_dict[self._to_id]
-                msg = notif.generate_notif_msg()
 
                 self._logger.info("Sending a Periodic Notification to ID [%s] over MTP [%s] at: %s",
                                   self._to_id, self._mtp_param_path, to_addr)
-                self._binding.send_msg(msg.SerializeToString(), to_addr)
+                self._binding.send_msg(notif_record.SerializeToString(), to_addr)
             else:
                 self._logger.warning("Could not send a Periodic Notification to an unknown Controller [%s]",
                                      self._to_id)
@@ -369,12 +370,12 @@ class StompValueChangeNotifPoller(abstract_agent.AbstractValueChangeNotifPoller)
             # Ensure the Controller Endpoint ID is known
             if to_id in self._controller_dest_dict:
                 to_addr = self._controller_dest_dict[to_id]
-                msg = notif.generate_notif_msg()
+                notif_record = notif.wrap_notif_in_record(notif.generate_notif_msg())
                 binding = self._binding_dict[controller_stomp_conn]
 
                 self._logger.info("Sending a ValueChange Notification to Controller [%s] over MTP [%s] at: %s",
                                   to_id, mtp_param_path, to_addr)
-                binding.send_msg(msg.SerializeToString(), to_addr)
+                binding.send_msg(notif_record.SerializeToString(), to_addr)
             else:
                 self._logger.warning("Could not send a Value Change Notification to an unknown Controller [%s]", to_id)
         else:

@@ -39,8 +39,8 @@ SOFTWARE.
 import logging
 
 from agent import utils
-from agent import usp_pb2 as usp
-
+from agent import usp_msg_pb2 as usp_msg
+from agent import usp_record_pb2 as usp_record
 
 
 class Notification(object):
@@ -52,22 +52,29 @@ class Notification(object):
         self._subscription_id = subscription_id
         self._logger = logging.getLogger(self.__class__.__name__)
 
-
     def generate_notif_msg(self):
         """Generate an appropriate USP Notification"""
         raise NotImplementedError()
 
-    def _init_notif(self, notif, send_resp=False):
+    def _init_notif(self, notif_msg, send_resp=False):
         """Set the Header Information of the Notification"""
-        notif.header.msg_id = utils.MessageIdHelper.get_message_id()
-        notif.header.msg_type = usp.Header.NOTIFY
-        notif.header.proto_version = "1.0"
-        notif.header.to_id = self._to_id
-        notif.header.from_id = self._from_id
+        notif_msg.header.msg_id = utils.MessageIdHelper.get_message_id()
+        notif_msg.header.msg_type = usp_msg.Header.NOTIFY
 
-        notif.body.request.notify.subscription_id = self._subscription_id
-        notif.body.request.notify.send_resp = send_resp
+        notif_msg.body.request.notify.subscription_id = self._subscription_id
+        notif_msg.body.request.notify.send_resp = send_resp
 
+    def wrap_notif_in_record(self, notif_msg):
+        """Wrap the Notification USP Message in a USP Record"""
+        notif_record = usp_record.Record()
+
+        notif_record.version = "1.0"
+        notif_record.to_id = self._to_id
+        notif_record.from_id = self._from_id
+        notif_record.payload_security = usp_record.Record.PLAINTEXT
+        notif_record.no_session_context.payload = notif_msg.SerializeToString()
+
+        return notif_record
 
 
 class BootNotification(Notification):
@@ -77,13 +84,12 @@ class BootNotification(Notification):
         Notification.__init__(self, from_id, to_id, subscription_id)
         self._db = db
 
-
     def generate_notif_msg(self):
         """Generate an appropriate USP Notification"""
         map_as_str = ""
-        notif = usp.Msg()
+        notif_msg = usp_msg.Msg()
         first_entry = True
-        self._init_notif(notif)
+        self._init_notif(notif_msg)
 
         # TODO: Replace hard-coded list with data model driven list
         boot_param_list = ["Device.DeviceInfo.ManufacturerOUI",
@@ -91,10 +97,10 @@ class BootNotification(Notification):
                            "Device.DeviceInfo.SerialNumber",
                            "Device.LocalAgent.X_ARRIS-COM_IPAddr"]
 
-        notif.body.request.notify.event.obj_path = "Device.LocalAgent."
-        notif.body.request.notify.event.event_name = "Boot!"
-        notif.body.request.notify.event.param_map["CommandKey"] = ""
-        notif.body.request.notify.event.param_map["Cause"] = "LocalReboot"
+        notif_msg.body.request.notify.event.obj_path = "Device.LocalAgent."
+        notif_msg.body.request.notify.event.event_name = "Boot!"
+        notif_msg.body.request.notify.event.params["CommandKey"] = ""
+        notif_msg.body.request.notify.event.params["Cause"] = "LocalReboot"
 
         for path in boot_param_list:
             value = self._db.get(path)
@@ -112,9 +118,9 @@ class BootNotification(Notification):
                 map_as_str += "\"\""
                 self._logger.warning("Boot Param [%s] is None", path)
 
-        notif.body.request.notify.event.param_map["BootParameterMap"] = map_as_str
-        return notif
+        notif_msg.body.request.notify.event.params["BootParameterMap"] = "{ " + map_as_str + " }"
 
+        return notif_msg
 
 
 class ValueChangeNotification(Notification):
@@ -125,17 +131,15 @@ class ValueChangeNotification(Notification):
         self._param = param
         self._value = value
 
-
     def generate_notif_msg(self):
         """Generate an appropriate USP Notification"""
-        notif = usp.Msg()
-        self._init_notif(notif)
+        notif_msg = usp_msg.Msg()
+        self._init_notif(notif_msg)
 
-        notif.body.request.notify.value_change.param_path = self._param
-        notif.body.request.notify.value_change.param_value = str(self._value)
+        notif_msg.body.request.notify.value_change.param_path = self._param
+        notif_msg.body.request.notify.value_change.param_value = str(self._value)
 
-        return notif
-
+        return notif_msg
 
 
 class PeriodicNotification(Notification):
@@ -145,13 +149,12 @@ class PeriodicNotification(Notification):
         Notification.__init__(self, from_id, to_id, subscription_id)
         self._param = param
 
-
     def generate_notif_msg(self):
         """Generate an appropriate USP Notification"""
-        notif = usp.Msg()
-        self._init_notif(notif)
+        notif_msg = usp_msg.Msg()
+        self._init_notif(notif_msg)
 
-        notif.body.request.notify.event.obj_path = "Device.LocalAgent."
-        notif.body.request.notify.event.event_name = "Periodic!"
+        notif_msg.body.request.notify.event.obj_path = "Device.LocalAgent."
+        notif_msg.body.request.notify.event.event_name = "Periodic!"
 
-        return notif
+        return notif_msg

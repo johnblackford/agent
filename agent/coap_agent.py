@@ -230,14 +230,12 @@ class CoapPeriodicNotifHandler(abstract_agent.AbstractPeriodicNotifHandler):
         self._controller_url = controller_url
 
 
-    def _handle_periodic(self, notif):
+    def _handle_periodic_record(self, notif_record):
         """Handle the CoAP Periodic Notification"""
-        msg = notif.generate_notif_msg()
-
         if self._binding is not None:
             self._logger.info("Sending a Periodic Notification to ID [%s] over MTP [%s] at: %s",
                               self._to_id, self._mtp_param_path, self._controller_url)
-            self._binding.send_msg(msg.SerializeToString(), self._controller_url)
+            self._binding.send_msg(notif_record.SerializeToString(), self._controller_url)
         else:
             self._logger.warning("Unable to send the Periodic Notification - No Binding")
 
@@ -261,8 +259,8 @@ class CoapValueChangeNotifPoller(abstract_agent.AbstractValueChangeNotifPoller):
         """Handle the Binding Specific Value Change Processing"""
         notif = notify.ValueChangeNotification(from_id, to_id, subscription_id, param, value)
         controller_url = self._db.get(mtp_param_path + "CoAP.URL")
-        msg = notif.generate_notif_msg()
+        notif_record = notif.wrap_notif_in_record(notif.generate_notif_msg())
 
         self._logger.info("Sending a ValueChange Notification to ID [%s] over MTP [%s] at: %s",
                           to_id, mtp_param_path, controller_url)
-        self._binding.send_msg(msg.SerializeToString(), controller_url)
+        self._binding.send_msg(notif_record.SerializeToString(), controller_url)

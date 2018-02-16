@@ -40,7 +40,7 @@ import random
 import datetime
 import subprocess
 
-from agent import usp_pb2 as usp
+from agent import usp_msg_pb2 as usp_msg
 
 
 
@@ -81,29 +81,18 @@ class MissingConfigError(Exception):
 
 class UspErrMsg(object):
     """A USP Error Message object that allows a USP Agent to generate a USP Error Message
-       NOTE: All generated Messages are usp_pb2.Msg format, not serialized"""
-    def __init__(self, msg_id, to_id, from_id):
+       NOTE: All generated Messages are usp_msg_pb2.Msg format, not serialized"""
+    def __init__(self, msg_id):
         """Initialize the USP Message Header"""
         self._msg_id = msg_id
-        self._to_id = to_id
-        self._from_id = from_id
-        self._msg = usp.Msg()
-
-
-    def _populate_header(self):
-        """Populate the Header of the USP Message"""
-        self._msg.header.msg_id = self._msg_id
-        self._msg.header.proto_version = "1.0"
-        self._msg.header.to_id = self._to_id
-        self._msg.header.from_id = self._from_id
-
+        self._msg = usp_msg.Msg()
 
     def generate_error(self, error_code, error_message):
         """Generate a USP Error Message
             NOTE: if there is no valid request, then there is no 'to' either,
                so no need to send a error back"""
-        self._populate_header()
-        self._msg.header.msg_type = usp.Header.ERROR
+        self._msg.header.msg_id = self._msg_id
+        self._msg.header.msg_type = usp_msg.Header.ERROR
         self._msg.body.error.err_code = error_code
         self._msg.body.error.err_msg = error_message
 

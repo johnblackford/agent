@@ -14,10 +14,11 @@ test-verbose:
 	nose2 -v --with-coverage
 
 schema:
-	protoc --proto_path=schema --python_out=agent schema/usp.proto
+	protoc --proto_path=schema --python_out=agent schema/usp-msg.proto
+	protoc --proto_path=schema --python_out=agent schema/usp-record.proto
 
 lint:
-	find agent -name "*.py" | egrep -v 'usp_pb2' | xargs pylint || :
+	find agent -name "*.py" | egrep -v 'pb2' | xargs pylint || :
 
 run:
 	python3 -m agent.main -t test
