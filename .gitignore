@@ -24,6 +24,7 @@ logs/
 # Ignore the databases
 database/*.db
 database/*.db-orig
+database/*.db-sizing
 
 # Ignore the pictures
 pictures/
