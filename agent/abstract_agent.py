@@ -40,7 +40,6 @@
 #   Class: BindingListener(threading.Thread)
 #     __init__(thread_name, binding, msg_handler, timeout=15)
 #     run()
-#     _get_addr_from_id(to_endpoint_id) :: Abstract Method
 #   Class: AbstractPeriodicNotifHandler(threading.Thread)
 #     __init__(database, thread_name, from_id, to_id, subscription_id, param)
 #     run()
@@ -114,7 +113,7 @@ class AbstractAgent(object):
                 subscription_id = self._db.get(instance + "ID")
                 self._logger.info("Skipping disabled Subscription [%s]", subscription_id)
 
-    def start_listening(self, timeout=15):
+    def start_listening(self):
         """
         Start listening for messages and process them
         NOTE: This does not actually listen to any binding, that needs to be done by the
@@ -371,10 +370,6 @@ class BindingListener(threading.Thread):
             self._logger.info("Responding with an Error to Endpoint Address [%s]", to_addr)
         else:
             self._logger.warning("Sending an Unknown Response")
-
-    def _get_addr_from_id(self, to_endpoint_id):
-        """Binding Specific implementation of how to get an Endpoint Address from an Endpoint ID"""
-        raise NotImplementedError()
 
 
 class AbstractPeriodicNotifHandler(threading.Thread):

@@ -29,7 +29,6 @@
 #     __init__(dm_file, db_file, cfg_file_name="cfg/agent.json")
 #     start_listening(timeout=15)
 #     clean_up()
-#   Class: StompBindingListener(threading.Thread)
 #   Class: StompPeriodicNotifHandler(abstract_agent.AbstractPeriodicNotifHandler)
 #     __init__(database, mtp_param_path, from_id, to_id, subscription_id, param)
 #     add_binding(controller_param_path, binding)
@@ -51,7 +50,6 @@ from agent import abstract_agent
 from agent import stomp_usp_binding
 
 
-
 class StompAgent(abstract_agent.AbstractAgent):
     """A USP Agent that uses the STOMP Binding"""
     def __init__(self, dm_file, db_file, net_intf, cfg_file_name="cfg/agent.json", debug=False):
@@ -68,7 +66,6 @@ class StompAgent(abstract_agent.AbstractAgent):
         self._init_bindings()
         self.init_subscriptions()
 
-
     def start_listening(self, timeout=15):
         """Start listening for messages and process them"""
         binding_listener_list = []
@@ -78,8 +75,7 @@ class StompAgent(abstract_agent.AbstractAgent):
         for binding_key in self._binding_dict:
             msg_handler = self.get_msg_handler()
             binding = self._binding_dict[binding_key]
-            controller_dest_dict = self._controller_stomp_conn_ref_dict[binding_key]
-            listener = StompBindingListener(binding_key, binding, msg_handler, controller_dest_dict, timeout)
+            listener = abstract_agent.BindingListener(binding_key, binding, msg_handler, timeout)
             listener.start()
             binding_listener_list.append(listener)
 
@@ -91,7 +87,6 @@ class StompAgent(abstract_agent.AbstractAgent):
         """Clean-up and prepare for shutdown"""
         for key in self._binding_dict:
             self._binding_dict[key].clean_up()
-
 
     def _init_bindings(self):
         """Initialize all Bindings from the Controller table"""
@@ -186,7 +181,6 @@ class StompAgent(abstract_agent.AbstractAgent):
 
         return agent_stomp_conn_dict
 
-
     def _create_binding(self, stomp_conn_ref, listen_dest):
         """Create a STOMP Binding object"""
         incoming_heartbeats = 0
@@ -276,28 +270,6 @@ class StompAgent(abstract_agent.AbstractAgent):
         return periodic_notif_handler
 
 
-
-class StompBindingListener(abstract_agent.BindingListener):
-    """A STOMP Specific implementation of an Abstract BindingListener"""
-    def __init__(self, thread_name, binding, msg_handler, controller_dest_dict, timeout=15):
-        """Initialize the STOMP Binding Listener"""
-        abstract_agent.BindingListener.__init__(self, thread_name, binding, msg_handler, timeout)
-
-        self._controller_dest_dict = controller_dest_dict
-
-
-    def _get_addr_from_id(self, to_endpoint_id):
-        """STOMP Specific implementation of how to get an Endpoint Address from an Endpoint ID"""
-        to_addr = None
-
-        if to_endpoint_id in self._controller_dest_dict:
-            to_addr = self._controller_dest_dict[to_endpoint_id]
-            self._logger.info("Using Address [%s] for Controller [%s]", to_addr, to_endpoint_id)
-
-        return to_addr
-
-
-
 class StompPeriodicNotifHandler(abstract_agent.AbstractPeriodicNotifHandler):
     """Issue a Periodic Notifications via a STOMP Binding"""
     def __init__(self, database, mtp_param_path, from_id, to_id, subscription_id,
@@ -308,7 +280,6 @@ class StompPeriodicNotifHandler(abstract_agent.AbstractPeriodicNotifHandler):
                                                              path_to_periodic_params)
         self._mtp_param_path = mtp_param_path
         self._controller_dest_dict = controller_dest_dict
-
 
     def _handle_periodic_record(self, notif_record):
         """Handle the STOMP Periodic Notification"""
@@ -333,7 +304,6 @@ class StompPeriodicNotifHandler(abstract_agent.AbstractPeriodicNotifHandler):
         return binding_exists
 
 
-
 class StompValueChangeNotifPoller(abstract_agent.AbstractValueChangeNotifPoller):
     """Poll Parameters for Value Change Notifications via a STOMP Binding"""
     def __init__(self, agent_db, poll_duration=0.5):
@@ -341,7 +311,6 @@ class StompValueChangeNotifPoller(abstract_agent.AbstractValueChangeNotifPoller)
         abstract_agent.AbstractValueChangeNotifPoller.__init__(self, agent_db, poll_duration)
         self._binding_dict = {}
         self._controller_dest_dict = {}
-
 
     def add_binding(self, stomp_conn_ref, binding):
         """Add a STOMP Binding associated to a Controller Parameter Path"""
@@ -351,7 +320,6 @@ class StompValueChangeNotifPoller(abstract_agent.AbstractValueChangeNotifPoller)
         """Remove a STOMP Binding"""
         del self._binding_dict[stomp_conn_ref]
 
-
     def add_controller_dest(self, controller_endpoint_id, dest_list):
         """Add a STOMP Binding associated to a Controller Parameter Path"""
         self._controller_dest_dict[controller_endpoint_id] = dest_list
@@ -359,7 +327,6 @@ class StompValueChangeNotifPoller(abstract_agent.AbstractValueChangeNotifPoller)
     def remove_controller_dest(self, controller_endpoint_id):
         """Remove a STOMP Binding"""
         del self._controller_dest_dict[controller_endpoint_id]
-
 
     def _handle_value_change(self, param, value, to_id, from_id, subscription_id, mtp_param_path):
         """Handle the STOMP Value Change Processing"""

@@ -28,7 +28,6 @@
 #     __init__(dm_file, db_file, cfg_file_name="cfg/agent.json", debug=False)
 #     start_listening(timeout=15)
 #     clean_up()
-#   Class: CoapBindingListener(threading.Thread)
 #   Class: CoapPeriodicNotifHandler(abstract_agent.AbstractPeriodicNotifHandler)
 #     __init__(database, mtp_param_path, from_id, to_id, subscription_id, param, controller_url)
 #     set_binding(binding)
@@ -47,7 +46,6 @@ from agent import abstract_agent
 from agent import coap_usp_binding
 
 
-
 class CoapAgent(abstract_agent.AbstractAgent):
     """A USP Agent that uses the CoAP Binding"""
     def __init__(self, dm_file, db_file, net_intf, port=5683, cfg_file_name="cfg/agent.json", debug=False):
@@ -60,7 +58,7 @@ class CoapAgent(abstract_agent.AbstractAgent):
         ip_addr = self._get_ip_addr(net_intf)
         if ip_addr is not None:
             url = "coap://" + ip_addr + ":" + str(port) + "/" + resource_path
-            num_local_agent_coap_mtps = self._init_db_for_mtp(url)
+            num_local_agent_coap_mtps = self._init_db_for_mtp(ip_addr, port, resource_path)
 
             # We only support 1 Local Agent CoAP MTP
             if num_local_agent_coap_mtps == 1:
@@ -85,14 +83,13 @@ class CoapAgent(abstract_agent.AbstractAgent):
             self._logger.error("IP Address could not be found for provided Network Interface [%s] - EXITING",
                                net_intf)
 
-
     def start_listening(self, timeout=15):
         """Start listening for messages and process them"""
         if self._can_start:
             abstract_agent.AbstractAgent.start_listening(self)
 
             msg_handler = self.get_msg_handler()
-            listener = CoapBindingListener("CoAP", self._db, self._binding, msg_handler, timeout)
+            listener = abstract_agent.BindingListener("CoAP", self._binding, msg_handler, timeout)
             listener.start()
             listener.join()
 
@@ -100,7 +97,6 @@ class CoapAgent(abstract_agent.AbstractAgent):
         """Clean up the USP Binding"""
         if self._can_start:
             self._binding.clean_up()
-
 
     def _get_ip_addr(self, net_intf):
         """Get the IP Address for this Agent"""
@@ -115,7 +111,7 @@ class CoapAgent(abstract_agent.AbstractAgent):
         """Return the supported Protocol as a String: CoAP, STOMP, HTTP/2, WebSockets"""
         return "CoAP"
 
-    def _init_db_for_mtp(self, url):
+    def _init_db_for_mtp(self, host, port, path):
         """Enable the LocalAgent MTPs for the supported protocol and Disable all other LocalAgent MTPs"""
         coap_mtp_count = 0
         agent_mtp_instances = self._db.find_instances("Device.LocalAgent.MTP.")
@@ -124,7 +120,9 @@ class CoapAgent(abstract_agent.AbstractAgent):
             if self._db.get(agent_mtp_path + "Protocol") == self._get_supported_protocol():
                 coap_mtp_count += 1
                 self._db.update(agent_mtp_path + "Enable", True)
-                self._db.update(agent_mtp_path + "CoAP.URL", url)
+                self._db.update(agent_mtp_path + "CoAP.Host", host)
+                self._db.update(agent_mtp_path + "CoAP.Port", str(port))
+                self._db.update(agent_mtp_path + "CoAP.Path", path)
             else:
                 self._db.update(agent_mtp_path + "Enable", False)
 
@@ -132,15 +130,17 @@ class CoapAgent(abstract_agent.AbstractAgent):
 
     def _get_notification_sender(self, notif, controller_id, mtp_param_path):
         """Return an instance of a binding specific AbstractNotificationSender"""
-        controller_url = self._db.get(mtp_param_path + "CoAP.URL")
+        controller_url = "coap://" + self._db.get(mtp_param_path + "CoAP.Host") + ":" + \
+                         str(self._db.get(mtp_param_path + "CoAP.Port")) + "/" + \
+                         self._db.get(mtp_param_path + "CoAP.Path")
+        # TODO: Make sure to substitiute the Host with mdns resolution
         return abstract_agent.NotificationSender(notif, self._binding, controller_url)
 
     def _get_periodic_notif_handler(self, agent_id, controller_id, mtp_param_path,
                                     subscription_id, param_path):
         """Return an instance of a binding specific AbstractPeriodicNotifHandler"""
-        controller_url = self._db.get(mtp_param_path + "CoAP.URL")
         periodic_notif_handler = CoapPeriodicNotifHandler(self._db, mtp_param_path, agent_id, controller_id,
-                                                          subscription_id, param_path, controller_url)
+                                                          subscription_id, param_path)
         periodic_notif_handler.set_binding(self._binding)
         return periodic_notif_handler
 
@@ -167,80 +167,30 @@ class CoapAgent(abstract_agent.AbstractAgent):
         return subtypes
 
 
-
-class CoapBindingListener(abstract_agent.BindingListener):
-    """A CoAP Specific implementation of an Abstract BindingListener"""
-    def __init__(self, thread_name, database, binding, msg_handler, timeout=15):
-        """Initialize the STOMP Binding Listener"""
-        abstract_agent.BindingListener.__init__(self, thread_name, binding, msg_handler, timeout)
-        self._db = database
-
-
-    def _get_addr_from_id(self, to_endpoint_id):
-        """CoAP Specific implementation of how to get an Endpoint Address from an Endpoint ID"""
-        controller_instances = self._db.find_instances("Device.LocalAgent.Controller.")
-
-        for controller_path in controller_instances:
-            controller_id = self._db.get(controller_path + "EndpointID")
-            if controller_id == to_endpoint_id:
-                if self._db.get(controller_path + "Enable"):
-                    return self._get_addr_from_mtps(controller_id, controller_path)
-                else:
-                    self._logger.warning("Can not retrieve CoAP URL for Controller [%s] because it is Disabled",
-                                         controller_id)
-            else:
-                self._logger.debug("Skipping Controller [%s] - Endpoint ID doesn't match: %s",
-                                   controller_id, to_endpoint_id)
-
-        return None
-
-    def _get_addr_from_mtps(self, controller_id, controller_path):
-        mtp_instances = self._db.find_instances(controller_path + "MTP.")
-
-        for mtp_path in mtp_instances:
-            if self._db.get(mtp_path + "Enable"):
-                protocol = self._db.get(mtp_path + "Protocol")
-
-                if protocol == self._get_supported_protocol():
-                    return self._db.get(mtp_path + "CoAP.URL")
-                else:
-                    mtp_name = self._db.get(mtp_path + "Name")
-                    self._logger.info("Skipping MTP [%s] on Controller [%s] - Wrong Protocol", mtp_name, controller_id)
-            else:
-                mtp_name = self._db.get(mtp_path + "Name")
-                self._logger.info("Skipping MTP [%s] on Controller [%s] - Disabled", mtp_name, controller_id)
-
-        return None
-
-    def _get_supported_protocol(self):
-        """Return the supported Protocol as a String: CoAP, STOMP, HTTP/2, WebSockets"""
-        return "CoAP"
-
-
-
 class CoapPeriodicNotifHandler(abstract_agent.AbstractPeriodicNotifHandler):
     """Issue a Periodic Notifications via a CoAP Binding"""
     def __init__(self, database, mtp_param_path, from_id, to_id, subscription_id,
-                 path_to_periodic_params, controller_url):
+                 path_to_periodic_params):
         """Initialize the CoAP Periodic Notification Handler"""
         abstract_agent.AbstractPeriodicNotifHandler.__init__(self, database, mtp_param_path,
                                                              from_id, to_id, subscription_id,
                                                              path_to_periodic_params)
         self._mtp_param_path = mtp_param_path
-        self._controller_url = controller_url
-
 
     def _handle_periodic_record(self, notif_record):
         """Handle the CoAP Periodic Notification"""
         if self._binding is not None:
+            controller_url = "coap://" + self._db.get(self._mtp_param_path + "CoAP.Host") + ":" + \
+                             str(self._db.get(self._mtp_param_path + "CoAP.Port")) + "/" + \
+                             self._db.get(self._mtp_param_path + "CoAP.Path")
+            # TODO: Make sure to substitiute the Host with mdns resolution
             self._logger.info("Sending a Periodic Notification to ID [%s] over MTP [%s] at: %s",
-                              self._to_id, self._mtp_param_path, self._controller_url)
-            self._binding.send_msg(notif_record.SerializeToString(), self._controller_url)
+                              self._to_id, self._mtp_param_path, controller_url)
+            self._binding.send_msg(notif_record.SerializeToString(), controller_url)
         else:
             self._logger.warning("Unable to send the Periodic Notification - No Binding")
 
         return True
-
 
 
 class CoapValueChangeNotifPoller(abstract_agent.AbstractValueChangeNotifPoller):
@@ -250,7 +200,6 @@ class CoapValueChangeNotifPoller(abstract_agent.AbstractValueChangeNotifPoller):
         abstract_agent.AbstractValueChangeNotifPoller.__init__(self, agent_database, poll_duration)
         self._binding = None
 
-
     def set_binding(self, binding):
         """Configure the CoAP Binding to use when sending the Notification"""
         self._binding = binding
@@ -258,7 +207,10 @@ class CoapValueChangeNotifPoller(abstract_agent.AbstractValueChangeNotifPoller):
     def _handle_value_change(self, param, value, to_id, from_id, subscription_id, mtp_param_path):
         """Handle the Binding Specific Value Change Processing"""
         notif = notify.ValueChangeNotification(from_id, to_id, subscription_id, param, value)
-        controller_url = self._db.get(mtp_param_path + "CoAP.URL")
+        controller_url = "coap://" + self._db.get(mtp_param_path + "CoAP.Host") + ":" + \
+                         str(self._db.get(mtp_param_path + "CoAP.Port")) + "/" + \
+                         self._db.get(mtp_param_path + "CoAP.Path")
+        # TODO: Make sure to substitiute the Host with mdns resolution
         notif_record = notif.wrap_notif_in_record(notif.generate_notif_msg())
 
         self._logger.info("Sending a ValueChange Notification to ID [%s] over MTP [%s] at: %s",
