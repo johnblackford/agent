@@ -88,7 +88,8 @@ class UspRequestHandler(object):
         self._logger.debug("Incoming payload parsed as a USP Record via Protocol Buffers")
 
         if self._debug:
-            self._logger.debug("Incoming USP Record:\n{}".format(req_as_record))
+            debug_msg = "Incoming USP Record:\n{}".format(req_as_record)
+            self._logger.debug("%s", debug_msg)
 
         return req_as_record
 
@@ -126,7 +127,8 @@ class UspRequestHandler(object):
         self._logger.debug("Incoming payload parsed as a USP Message via Protocol Buffers")
 
         if self._debug:
-            self._logger.debug("Incoming USP Message:\n{}".format(req_as_msg))
+            debug_msg = "Incoming USP Message:\n{}".format(req_as_msg)
+            self._logger.debug("%s", debug_msg)
 
         return req_as_msg
 
