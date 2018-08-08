@@ -62,6 +62,9 @@ class CoapAgent(abstract_agent.AbstractAgent):
 
             # We only support 1 Local Agent CoAP MTP
             if num_local_agent_coap_mtps == 1:
+                self._mdns_listener = mdns.Listener()
+                self._mdns_listener.listen()
+
                 self._binding = coap_usp_binding.CoapUspBinding(ip_addr, self._endpoint_id, port,
                                                                 resource_path=resource_path, debug=debug)
                 self._binding.listen(url)
@@ -70,6 +73,7 @@ class CoapAgent(abstract_agent.AbstractAgent):
                 self._mdns_announcer.announce(self._get_friendly_name(), self._get_subtypes())
 
                 value_change_notif_poller = CoapValueChangeNotifPoller(self._db)
+                value_change_notif_poller.set_mdns_listener(self._mdns_listener)
                 value_change_notif_poller.set_binding(self._binding)
                 self.set_value_change_notif_poller(value_change_notif_poller)
 
@@ -130,17 +134,17 @@ class CoapAgent(abstract_agent.AbstractAgent):
 
     def _get_notification_sender(self, notif, controller_id, mtp_param_path):
         """Return an instance of a binding specific AbstractNotificationSender"""
-        controller_url = "coap://" + self._db.get(mtp_param_path + "CoAP.Host") + ":" + \
-                         str(self._db.get(mtp_param_path + "CoAP.Port")) + "/" + \
-                         self._db.get(mtp_param_path + "CoAP.Path")
-        # TODO: Make sure to substitiute the Host with mdns resolution
-        return abstract_agent.NotificationSender(notif, self._binding, controller_url)
+        return CoapNotificationSender(notif, self._binding, self._mdns_listener,
+                                      self._db.get(mtp_param_path + "CoAP.Host"),
+                                      self._db.get(mtp_param_path + "CoAP.Port"),
+                                      self._db.get(mtp_param_path + "CoAP.Path"))
 
     def _get_periodic_notif_handler(self, agent_id, controller_id, mtp_param_path,
                                     subscription_id, param_path):
         """Return an instance of a binding specific AbstractPeriodicNotifHandler"""
         periodic_notif_handler = CoapPeriodicNotifHandler(self._db, mtp_param_path, agent_id, controller_id,
                                                           subscription_id, param_path)
+        periodic_notif_handler.set_mdns_listener(self._mdns_listener)
         periodic_notif_handler.set_binding(self._binding)
         return periodic_notif_handler
 
@@ -176,17 +180,28 @@ class CoapPeriodicNotifHandler(abstract_agent.AbstractPeriodicNotifHandler):
                                                              from_id, to_id, subscription_id,
                                                              path_to_periodic_params)
         self._mtp_param_path = mtp_param_path
+        self._mdns_listener = None
+
+    def set_mdns_listener(self, listener):
+        """Configure the mDNS Listener to use when sending the Notification"""
+        self._mdns_listener = listener
 
     def _handle_periodic_record(self, notif_record):
         """Handle the CoAP Periodic Notification"""
         if self._binding is not None:
-            controller_url = "coap://" + self._db.get(self._mtp_param_path + "CoAP.Host") + ":" + \
-                             str(self._db.get(self._mtp_param_path + "CoAP.Port")) + "/" + \
-                             self._db.get(self._mtp_param_path + "CoAP.Path")
-            # TODO: Make sure to substitiute the Host with mdns resolution
-            self._logger.info("Sending a Periodic Notification to ID [%s] over MTP [%s] at: %s",
-                              self._to_id, self._mtp_param_path, controller_url)
-            self._binding.send_msg(notif_record.SerializeToString(), controller_url)
+            if self._mdns_listener is not None:
+                resolved_ip_addr = self._mdns_listener.resolve_host(self._db.get(self._mtp_param_path + "CoAP.Host"))
+                if resolved_ip_addr is not None:
+                    controller_url = "coap://" + resolved_ip_addr + ":" + \
+                                     str(self._db.get(self._mtp_param_path + "CoAP.Port")) + "/" + \
+                                     self._db.get(self._mtp_param_path + "CoAP.Path")
+                    self._logger.info("Sending a Periodic Notification to ID [%s] over MTP [%s] at: %s",
+                                      self._to_id, self._mtp_param_path, controller_url)
+                    self._binding.send_msg(notif_record.SerializeToString(), controller_url)
+                else:
+                    self._logger.warning("Unable to send the Periodic Notification - Can't Resolve Host Name")
+            else:
+                self._logger.warning("Unable to send the Periodic Notification - mDNS Listener not registered")
         else:
             self._logger.warning("Unable to send the Periodic Notification - No Binding")
 
@@ -199,20 +214,56 @@ class CoapValueChangeNotifPoller(abstract_agent.AbstractValueChangeNotifPoller):
         """Initialize the STOMP Value Change Notification Poller"""
         abstract_agent.AbstractValueChangeNotifPoller.__init__(self, agent_database, poll_duration)
         self._binding = None
+        self._mdns_listener = None
 
     def set_binding(self, binding):
         """Configure the CoAP Binding to use when sending the Notification"""
         self._binding = binding
 
+    def set_mdns_listener(self, listener):
+        """Configure the mDNS Listener to use when sending the Notification"""
+        self._mdns_listener = listener
+
     def _handle_value_change(self, param, value, to_id, from_id, subscription_id, mtp_param_path):
         """Handle the Binding Specific Value Change Processing"""
         notif = notify.ValueChangeNotification(from_id, to_id, subscription_id, param, value)
-        controller_url = "coap://" + self._db.get(mtp_param_path + "CoAP.Host") + ":" + \
-                         str(self._db.get(mtp_param_path + "CoAP.Port")) + "/" + \
-                         self._db.get(mtp_param_path + "CoAP.Path")
-        # TODO: Make sure to substitiute the Host with mdns resolution
-        notif_record = notif.wrap_notif_in_record(notif.generate_notif_msg())
+        if self._binding is not None:
+            if self._mdns_listener is not None:
+                resolved_ip_addr = self._mdns_listener.resolve_host(self._db.get(mtp_param_path + "CoAP.Host"))
+                if resolved_ip_addr is not None:
+                    controller_url = "coap://" + resolved_ip_addr + ":" + \
+                                     str(self._db.get(mtp_param_path + "CoAP.Port")) + "/" + \
+                                     self._db.get(mtp_param_path + "CoAP.Path")
+                    notif_record = notif.wrap_notif_in_record(notif.generate_notif_msg())
 
-        self._logger.info("Sending a ValueChange Notification to ID [%s] over MTP [%s] at: %s",
-                          to_id, mtp_param_path, controller_url)
-        self._binding.send_msg(notif_record.SerializeToString(), controller_url)
+                    self._logger.info("Sending a ValueChange Notification to ID [%s] over MTP [%s] at: %s",
+                                      to_id, mtp_param_path, controller_url)
+                    self._binding.send_msg(notif_record.SerializeToString(), controller_url)
+                else:
+                    self._logger.warning("Unable to send the ValueChange Notification - Can't Resolve Host Name")
+            else:
+                self._logger.warning("Unable to send the ValueChange Notification - mDNS Listener not registered")
+        else:
+            self._logger.warning("Unable to send the ValueChange Notification - No Binding")
+
+
+class CoapNotificationSender(abstract_agent.NotificationSender):
+    """A CoAP specific implementation of the Abstract Notification Sender"""
+    def __init__(self, notif, binding, mdns_listener, host, port, path):
+        """Initialize the CoAP Notification Sender"""
+        abstract_agent.NotificationSender.__init__(self, notif, binding)
+        self._host = host
+        self._port = port
+        self._path = path
+        self._mdns_listener = mdns_listener
+
+    def _retrieve_to_addr(self):
+        to_addr = None
+        resolved_ip_addr = self._mdns_listener.resolve_host(self._host)
+
+        if resolved_ip_addr is not None:
+            to_addr = "coap://" + resolved_ip_addr + ":" + str(self._port) + "/" + self._path
+        else:
+            self._logger.warning("Unable to Resolve Host Name [%s]", self._host)
+
+        return to_addr
