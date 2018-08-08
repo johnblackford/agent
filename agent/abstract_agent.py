@@ -113,7 +113,7 @@ class AbstractAgent(object):
                 subscription_id = self._db.get(instance + "ID")
                 self._logger.info("Skipping disabled Subscription [%s]", subscription_id)
 
-    def start_listening(self):
+    def start_listening(self, timeout=15):
         """
         Start listening for messages and process them
         NOTE: This does not actually listen to any binding, that needs to be done by the
@@ -487,15 +487,34 @@ class AbstractValueChangeNotifPoller(threading.Thread):
 
 class NotificationSender(threading.Thread):
     """A Generic Notification Sender"""
-    def __init__(self, notif, binding, to_addr):
+    def __init__(self, notif, binding, num_retries=3, retry_interval=2):
         """Initialize the Notification Sender"""
         self._binding = binding
-        self._to_addr = to_addr
+        self._num_retries = num_retries
+        self._retry_interval = retry_interval
         self._notif_msg = notif.generate_notif_msg()
         self._subscription_id = self._notif_msg.body.request.notify.subscription_id
         self._notif_record = notif.wrap_notif_in_record(self._notif_msg)
+        self._logger = logging.getLogger(self.__class__.__name__)
         threading.Thread.__init__(self, name="NotificationSender" + self._subscription_id)
 
     def run(self):
         """Thread execution code - send the Notification"""
-        self._binding.send_msg(self._notif_record.SerializeToString(), self._to_addr)
+        to_addr = None
+        retry_count = 0
+
+        while to_addr is None or retry_count > self._num_retries:
+            to_addr = self._retrieve_to_addr()
+            if to_addr is None:
+                self._logger.info("Waiting %d seconds before attempting to resolve address", self._retry_interval)
+                time.sleep(self._retry_interval)
+                retry_count += 1
+
+        if to_addr is not None:
+            self._binding.send_msg(self._notif_record.SerializeToString(), to_addr)
+        else:
+            self._logger.warning("Failed to send Notification - could not retrieve destination address")
+
+    def _retrieve_to_addr(self):
+        """Retrieve the MTP specific address that indicates where the notification is to be sent"""
+        raise NotImplementedError()

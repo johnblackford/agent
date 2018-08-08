@@ -243,7 +243,7 @@ class StompAgent(abstract_agent.AbstractAgent):
 
         if controller_stomp_conn in self._binding_dict:
             binding = self._binding_dict[controller_stomp_conn]
-            notif_sender = abstract_agent.NotificationSender(notif, binding, to_addr)
+            notif_sender = StompNotificationSender(notif, binding, to_addr)
         else:
             self._logger.warning("Attempted to retrieve a Notification Sender for an unknown Controller/MTP [%s]",
                                  mtp_param_path)
@@ -348,3 +348,14 @@ class StompValueChangeNotifPoller(abstract_agent.AbstractValueChangeNotifPoller)
         else:
             self._logger.warning("Could not send ValueChange Notification to an unknown Controller/MTP [%s]",
                                  mtp_param_path)
+
+
+class StompNotificationSender(abstract_agent.NotificationSender):
+    """A STOMP specific implementation of the Abstract Notification Sender"""
+    def __init__(self, notif, binding, to_addr):
+        """Initialize the STOMP Notification Sender"""
+        abstract_agent.NotificationSender.__init__(self, notif, binding)
+        self._to_addr = to_addr
+
+    def _retrieve_to_addr(self):
+        return self._to_addr
