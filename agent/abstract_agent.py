@@ -90,7 +90,7 @@ NUM_VC_NOTIFS_COUNTER_METRIC = \
                               "Number of ValueChange Notifications sent")
 
 
-class AbstractAgent(object):
+class AbstractAgent:
     """An Abstract USP Agent that can be built upon for a specific binding"""
     def __init__(self, dm_file, db_file, net_intf, cfg_file_name, debug=False):
         """Initialize the Abstract Agent"""
@@ -211,7 +211,7 @@ class AbstractAgent(object):
             if self._db.get(controller_path + "Enable"):
                 mtp_path_list = self._get_valid_mtp_paths(controller_path)
 
-                if len(mtp_path_list) > 0:
+                if mtp_path_list:
                     for mtp_path in mtp_path_list:
                         controller_id = self._db.get(controller_path + "EndpointID")
 
@@ -252,7 +252,7 @@ class AbstractAgent(object):
         ref_event_list = ref_list.split(",")
 
         for event_path in ref_event_list:
-            if len(event_path) > 0:
+            if event_path:
                 if event_path.strip() == supported_boot_event:
                     self._handle_boot(controller_id, mtp_path, subscription_id)
                 elif event_path.strip() == supported_periodic_event:
@@ -297,7 +297,7 @@ class AbstractAgent(object):
         ref_param_list = ref_list.split(",")
         if self._value_change_notif_poller is not None:
             for param_path in ref_param_list:
-                if len(param_path.strip()) > 0:
+                if param_path.strip():
                     try:
                         self._value_change_notif_poller.add_param(param_path.strip(), self._endpoint_id,
                                                                   controller_id, mtp_path, subscription_id)
@@ -317,11 +317,11 @@ class AbstractAgent(object):
         """Return the supported Protocol as a String: CoAP, STOMP, HTTP/2, WebSockets"""
         raise NotImplementedError()
 
-    def _get_notification_sender(self, notif, controller_id, mtp_path):
+    def _get_notification_sender(self, notif, controller_id, mtp_param_path):
         """Return an instance of a binding specific AbstractNotificationSender"""
         raise NotImplementedError()
 
-    def _get_periodic_notif_handler(self, agent_id, controller_id, mtp_path,
+    def _get_periodic_notif_handler(self, agent_id, controller_id, mtp_param_path,
                                     subscription_id, param_path):
         """Return an instance of a binding specific AbstractPeriodicNotifHandler"""
         raise NotImplementedError()

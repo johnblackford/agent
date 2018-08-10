@@ -121,11 +121,13 @@ class Database:
     @DB_GET_SUMMARY_METRIC.time()
     def get(self, path):
         """Retrieve the value of the incoming path, or throw a NoSuchPathError"""
+        value = None
+
         if path in self._db:
             if self._db[path] == "__UPTIME__":
-                return int(time.time() - self._start_time)
+                value = int(time.time() - self._start_time)
             elif self._db[path] == "__IPADDR__":
-                return utils.IPAddr.get_ip_addr(self._net_intf)
+                value = utils.IPAddr.get_ip_addr(self._net_intf)
             elif self._db[path] == "__CURR_TIME__":
                 time_zone = self._db["Device.Time.LocalTimeZone"]
                 tz_part = time_zone.split(",")[0]
@@ -135,15 +137,17 @@ class Database:
                     now_str += "-06:00"
                 else:
                     now_str += "Z"
-                return now_str
+                value = now_str
             elif self._db[path] == "__NUM_ENTRIES__":
                 inst_path = re.sub(r'NumberOfEntries', '.', path)
                 found_instances = self.find_instances(inst_path)
-                return len(found_instances)
+                value = len(found_instances)
             else:
-                return self._db[path]
+                value = self._db[path]
         else:
             raise NoSuchPathError(path)
+
+        return value
 
     @DB_UPDATE_SUMMARY_METRIC.time()
     def update(self, path, value):

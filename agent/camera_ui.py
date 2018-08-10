@@ -48,7 +48,7 @@ import bottle
 
 
 
-class CameraWebUI(object):
+class CameraWebUI:
     """The Web UI for the USP Camera"""
     def __init__(self, host="localhost", port="8080", directory="pictures"):
         """Initialize the CameraWebUI"""

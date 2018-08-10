@@ -44,7 +44,7 @@ import logging
 import collections
 
 
-class GenericUspBinding(object):
+class GenericUspBinding:
     """A Generic USP Binding class to be used by specific protocol USP Binding classes"""
     def __init__(self, sleep_time_interval=1):
         """Initialize the Generic USP Binding"""
@@ -61,7 +61,7 @@ class GenericUspBinding(object):
         """Pop the next payload off of the front of the incoming message queue"""
         queue_item = None
 
-        if len(self._incoming_queue) > 0:
+        if self._incoming_queue:
             queue_item = self._incoming_queue.popleft()
             if queue_item.is_expired():
                 queue_item = None
@@ -107,7 +107,7 @@ class GenericUspBinding(object):
         raise NotImplementedError()
 
 
-class ExpiringQueueItem(object):
+class ExpiringQueueItem:
     """A Queue Item that has a TTL and a Payload"""
     def __init__(self, payload, reply_to_addr, ttl=60):
         """Initialize the ExpiringQueueItem with the payload and a TTL (default of 60 seconds)"""

@@ -44,7 +44,7 @@ from agent import utils
 
 
 
-class DetectMotion(object):
+class DetectMotion:
     """Base Class for handling a motion detector"""
     def __init__(self, gpio_pin):
         """Initialize the Detect Motion class"""

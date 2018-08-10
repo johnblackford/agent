@@ -48,7 +48,7 @@ LOG_FILE = "logs/agent.log"
 
 
 
-class RecordImage(object):
+class RecordImage:
     """Base Class for recording an image from the camera"""
     def __init__(self, directory, filename_prefix):
         """Initialize the Record Image class"""

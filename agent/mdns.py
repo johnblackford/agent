@@ -37,7 +37,7 @@ import logging
 import zeroconf
 
 
-class Announcer(object):
+class Announcer:
     """Announce a CoAP Agent via mDNS"""
     def __init__(self, ip_addr, coap_port, coap_resource_path, usp_endpoint_id):
         """Initialize the Announcer class"""
@@ -73,7 +73,7 @@ class Announcer(object):
         self._zconf.close()
 
 
-class Listener(object):
+class Listener:
     """Listen for CoAP Controllers via mDNS"""
     def __init__(self):
         """Initialize the Listener Class"""

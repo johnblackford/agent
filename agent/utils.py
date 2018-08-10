@@ -44,7 +44,7 @@ from agent import usp_msg_pb2 as usp_msg
 
 
 
-class ConfigMgr(object):
+class ConfigMgr:
     """A generic Configuration Manager"""
     def __init__(self, cfg_file_name, default_cfg_val_map):
         """Initialize the ConfigMgr"""
@@ -63,14 +63,18 @@ class ConfigMgr(object):
 
     def get_cfg_item(self, key):
         """Retrieve the Config Entry"""
+        value = None
+
         if key in self._cfg_file_contents:
-            return self._cfg_file_contents[key]
+            value = self._cfg_file_contents[key]
         else:
             if key in self._default_cfg_val_map:
-                return self._default_cfg_val_map[key]
+                value = self._default_cfg_val_map[key]
             else:
                 err_msg = "Key [{}] not found".format(key)
                 raise MissingConfigError(err_msg)
+
+        return value
 
 
 class MissingConfigError(Exception):
@@ -79,7 +83,7 @@ class MissingConfigError(Exception):
 
 
 
-class UspErrMsg(object):
+class UspErrMsg:
     """A USP Error Message object that allows a USP Agent to generate a USP Error Message
        NOTE: All generated Messages are usp_msg_pb2.Msg format, not serialized"""
     def __init__(self, msg_id):
@@ -110,7 +114,7 @@ class MessageIdHelper:
 
 
 
-class PathHelper(object):
+class PathHelper:
     """A Parameter Path Helper Class"""
     @staticmethod
     def build_path_from_parts(path_parts, partial_path_part_len):
@@ -189,7 +193,7 @@ class IPAddr:
 
 
 
-class TimeHelper(object):
+class TimeHelper:
     """A Helper Class for getting the Time as a String"""
     @staticmethod
     def get_time_as_str(time_to_convert, timezone=None):
