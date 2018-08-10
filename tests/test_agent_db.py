@@ -956,6 +956,36 @@ def test_update_no_such_path():
 """
 
 
+def test_insert_instance():
+    file_mock = dm_mock = mock.mock_open(read_data=get_dm_file_contents())
+    db_mock = mock.mock_open(read_data=get_db_file_contents())
+    file_mock.side_effect = [dm_mock.return_value, db_mock.return_value]
+
+    with mock.patch("builtins.open", file_mock):
+        with mock.patch.object(agent_db.Database, '_save') as save_mock:
+            my_db = agent_db.Database("mock_dm.json", "mock_db.json", "intf")
+            my_db.insert("Device.Services.HomeAutomation.1.Camera.2.Pic.")
+
+    # _save gets called twice during an insert
+    save_mock.assert_called()
+
+
+def test_insert_instance_no_such_path():
+    file_mock = dm_mock = mock.mock_open(read_data=get_dm_file_contents())
+    db_mock = mock.mock_open(read_data=get_db_file_contents())
+    file_mock.side_effect = [dm_mock.return_value, db_mock.return_value]
+
+    with mock.patch("builtins.open", file_mock):
+        my_db = agent_db.Database("mock_dm.json", "mock_db.json", "intf")
+        my_db._save = mock.MagicMock()
+
+        try:
+            my_db.insert("Device.NoSuchPath.")
+            assert False, "NoSuchPathError Expected"
+        except agent_db.NoSuchPathError:
+            pass
+
+
 """
  Tests for delete
    NOTE: Mocking the _save method
