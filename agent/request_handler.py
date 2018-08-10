@@ -63,7 +63,7 @@ NUM_UNKNOWN_MSGS_METRIC = \
                               "Number of Unknown USP Messages")
 
 
-class UspRequestHandler(object):
+class UspRequestHandler:
     """A USP Message Handler: to be used by a USP Agent"""
     def __init__(self, endpoint_id, agent_database, service_map=None, debug=False):
         """Initialize the USP Request Handler"""
@@ -114,16 +114,16 @@ class UspRequestHandler(object):
         if not req_as_record.IsInitialized():
             raise ProtocolValidationError("USP Record missing Required Fields")
 
-        if len(req_as_record.version) <= 0:
+        if not req_as_record.version:
             raise ProtocolValidationError("USP Record missing version")
 
-        if len(req_as_record.to_id) <= 0:
+        if not req_as_record.to_id:
             raise ProtocolValidationError("USP Record missing to_id")
 
         if req_as_record.to_id != self._id:
             raise ProtocolValidationError("USP Record has incorrect to_id")
 
-        if len(req_as_record.from_id) <= 0:
+        if not req_as_record.from_id:
             raise ProtocolValidationError("Header missing from_id")
 
         if not req_as_record.payload_security == usp_record.Record.PLAINTEXT:
@@ -153,7 +153,7 @@ class UspRequestHandler(object):
         if not req_as_msg.IsInitialized():
             raise ProtocolValidationError("USP Message missing Required Fields")
 
-        if len(req_as_msg.header.msg_id) <= 0:
+        if not req_as_msg.header.msg_id:
             raise ProtocolValidationError("USP Message Header missing msg_id")
 
         if not req_as_msg.body.WhichOneof("msg_body") == "request":
@@ -264,11 +264,11 @@ class UspRequestHandler(object):
         self._validate_set(req_msg, path_to_set_dict, update_obj_result_list, set_failure_param_err_list)
 
         # Finished with all validation, process the errors or make the updates
-        if len(set_failure_param_err_list) > 0:
+        if set_failure_param_err_list:
             usp_err_msg = utils.UspErrMsg(req_msg.header.msg_id)
             err_msg = "Invalid Path Found, Allow Partial Updates = False :: Fail the entire Set"
-            resp = usp_err_msg.generate_error(9000, err_msg)
-            resp.body.error.param_errs.extend(set_failure_param_err_list)
+            resp_msg = usp_err_msg.generate_error(9000, err_msg)
+            resp_msg.body.error.param_errs.extend(set_failure_param_err_list)
         else:
             # Process the Updates against the database
             for param_path in path_to_set_dict:
@@ -297,12 +297,12 @@ class UspRequestHandler(object):
                     set_failure_err_list, update_inst_result = \
                         self._validate_set_params(affected_path, obj_to_update, path_to_set_dict)
 
-                    if len(set_failure_err_list) > 0:
+                    if set_failure_err_list:
                         obj_path_set_failure_err_dict[affected_path] = set_failure_err_list
 
                     update_inst_result_list.append(update_inst_result)
 
-                if len(obj_path_set_failure_err_dict) == 0:
+                if not obj_path_set_failure_err_dict:
                     # If there were no Set Failure errors for the obj_to_update, oper_success
                     update_obj_result = usp_msg.SetResp.UpdatedObjectResult()
                     update_obj_result.requested_path = obj_path_to_update
@@ -346,6 +346,7 @@ class UspRequestHandler(object):
             except agent_db.NoSuchPathError:
                 param_failure = True
                 err_msg = "Parameter does not exist"
+                print("Here1")
 
             if param_failure:
                 param_err = usp_msg.SetResp.ParameterError()
@@ -355,6 +356,7 @@ class UspRequestHandler(object):
 
                 if param_to_update.required:
                     set_failure_err_list.append(param_err)
+                    print("Here2")
                 else:
                     param_err_list.append(param_err)
 
@@ -515,7 +517,7 @@ class UspRequestHandler(object):
         try:
             affected_path_list = self._db.find_objects(partial_path)
 
-            if len(affected_path_list) == 0:
+            if not affected_path_list:
                 if is_search_path or is_static_path:
                     pass
                 else:
