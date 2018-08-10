@@ -61,6 +61,7 @@ import time
 import logging
 import threading
 import importlib
+import prometheus_client
 
 from agent import utils
 from agent import notify
@@ -70,6 +71,23 @@ from agent import request_handler
 
 GPIO_PIN = "gpio.pin"
 CAMERA_IMAGE_DIR = "camera.image.dir"
+
+# pylint: disable-msg=no-value-for-parameter
+INCOMING_REQ_SUMMARY_METRIC = \
+    prometheus_client.Summary('incoming_request_processing_seconds',
+                              'Time spent handling incoming USP requests')
+# pylint: disable-msg=no-value-for-parameter
+NUM_PROTO_VIOLATIONS_METRIC = \
+    prometheus_client.Counter("number_of_proto_violations",
+                              "Number of Protocol Violations detected")
+# pylint: disable-msg=no-value-for-parameter
+NUM_VC_PARAMS_GAUGE_METRIC = \
+    prometheus_client.Gauge("number_of_value_change_params",
+                            "Number of ValueChange Parameters being monitored")
+# pylint: disable-msg=no-value-for-parameter
+NUM_VC_NOTIFS_COUNTER_METRIC = \
+    prometheus_client.Counter("number_of_value_change_notifs",
+                              "Number of ValueChange Notifications sent")
 
 
 class AbstractAgent(object):
@@ -336,6 +354,7 @@ class BindingListener(threading.Thread):
         except GeneratorExit:
             self._logger.info("STOMP Binding Listener is Shutting Down as requested...")
 
+    @INCOMING_REQ_SUMMARY_METRIC.time()
     def _handle_request(self, queue_item):
         """Handle a Request/Response interaction"""
         resp_msg = None
@@ -355,6 +374,7 @@ class BindingListener(threading.Thread):
         except request_handler.ProtocolViolationError:
             # Error already logged in the USP Protocol Tool, nothing to do
             self._logger.debug("USP Protocol Violation Encountered - dropping the Request")
+            NUM_PROTO_VIOLATIONS_METRIC.inc()
 
         return resp_msg
 
@@ -455,12 +475,14 @@ class AbstractValueChangeNotifPoller(threading.Thread):
                         from_id = notif_details[self.FROM_ID]
                         subscription_id = notif_details[self.SUBSCRIPTION_ID]
                         mtp_param_path = notif_details[self.MTP]
+                        NUM_VC_NOTIFS_COUNTER_METRIC.inc()
                         self._handle_value_change(param, value, to_id, from_id,
                                                   subscription_id, mtp_param_path)
 
     def add_param(self, param, agent_id, controller_id, mtp_param_path, subscription_id):
         """Add a Parameter to the Polling List"""
         self._logger.info("Adding %s to the ValueChange Notification Poller", param)
+        NUM_VC_PARAMS_GAUGE_METRIC.inc()
         value_change_notif_details_dict = {}
         value_change_notif_details_dict[self.FROM_ID] = agent_id
         value_change_notif_details_dict[self.TO_ID] = controller_id
@@ -475,6 +497,8 @@ class AbstractValueChangeNotifPoller(threading.Thread):
     def remove_param(self, param):
         """Remove a Parameter from the Polling List"""
         self._logger.info("Removing %s from the ValueChange Notification Poller", param)
+        NUM_VC_PARAMS_GAUGE_METRIC.dec()
+
         with self._cache_lock:
             del self._param_cache[param]
             self._param_poll_list.remove(param)

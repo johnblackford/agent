@@ -35,6 +35,7 @@ SOFTWARE.
 
 import re
 import logging
+import prometheus_client
 
 from agent import utils
 from agent import agent_db
@@ -43,6 +44,23 @@ from agent import usp_record_pb2 as usp_record
 
 
 TAKE_PICTURE_CAMERA_OP = "Device.Services.HomeAutomation.1.Camera.1.TakePicture()"
+
+# pylint: disable-msg=no-value-for-parameter
+NUM_GET_MSGS_METRIC = \
+    prometheus_client.Counter("number_of_usp_get_msgs",
+                              "Number of USP Get Messages")
+# pylint: disable-msg=no-value-for-parameter
+NUM_SET_MSGS_METRIC = \
+    prometheus_client.Counter("number_of_usp_set_msgs",
+                              "Number of USP Set Messages")
+# pylint: disable-msg=no-value-for-parameter
+NUM_OPERATE_MSGS_METRIC = \
+    prometheus_client.Counter("number_of_usp_operate_msgs",
+                              "Number of USP Operate Messages")
+# pylint: disable-msg=no-value-for-parameter
+NUM_UNKNOWN_MSGS_METRIC = \
+    prometheus_client.Counter("number_of_usp_unknown_msgs",
+                              "Number of Unknown USP Messages")
 
 
 class UspRequestHandler(object):
@@ -53,8 +71,6 @@ class UspRequestHandler(object):
         self._id = endpoint_id
         self._db = agent_database
         self._service_map = service_map
-
-        # Initialize the class logger
         self._logger = logging.getLogger(self.__class__.__name__)
 
     def handle_request(self, msg_payload):
@@ -156,18 +172,22 @@ class UspRequestHandler(object):
         if req_as_msg.header.msg_type == usp_msg.Header.GET:
             # Validate that the Request body matches the Header's msg_type
             if req_as_msg.body.request.WhichOneof("req_type") == "get":
+                NUM_GET_MSGS_METRIC.inc()
                 resp_msg = self._process_get(req_as_msg)
         elif req_as_msg.header.msg_type == usp_msg.Header.SET:
             # Validate that the Request body matches the Header's msg_type
             if req_as_msg.body.request.WhichOneof("req_type") == "set":
+                NUM_SET_MSGS_METRIC.inc()
                 resp_msg = self._process_set(req_as_msg)
         elif req_as_msg.header.msg_type == usp_msg.Header.OPERATE:
             # Validate that the Request body matches the Header's msg_type
             if req_as_msg.body.request.WhichOneof("req_type") == "operate":
+                NUM_OPERATE_MSGS_METRIC.inc()
                 resp_msg = self._process_operation(req_as_msg)
         else:
             err_msg = "Invalid USP Message: unknown command"
             resp_msg = usp_err_msg.generate_error(9000, err_msg)
+            NUM_UNKNOWN_MSGS_METRIC.inc()
 
         # Wrap the USP Message response into a USP Record
         resp_record.version = "1.0"
@@ -234,6 +254,7 @@ class UspRequestHandler(object):
         path_to_set_dict = {}
         update_obj_result_list = []
         set_failure_param_err_list = []
+        self._logger.info("Processing a Set Request...")
 
         # Populate the Response's Header information
         resp_msg.header.msg_id = req_msg.header.msg_id

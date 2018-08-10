@@ -33,6 +33,7 @@ SOFTWARE.
 
 import logging
 import argparse
+import prometheus_client
 
 from agent import coap_agent
 from agent import stomp_agent
@@ -71,6 +72,8 @@ class Agent(object):
 
         dm_file_name = "database/{}-dm.json".format(client_type)
         db_file_name = "database/{}.db".format(client_type)
+
+        prometheus_client.start_http_server(9001)
 
         if use_coap:
             logging.info("#######################################################")

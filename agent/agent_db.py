@@ -45,12 +45,45 @@ import time
 import logging
 import datetime
 import threading
+import prometheus_client
 
 from agent import utils
 
+# pylint: disable-msg=no-value-for-parameter
+DB_GET_SUMMARY_METRIC = \
+    prometheus_client.Summary("database_get_processing_seconds",
+                              "Time spent handling Database Get Call")
+# pylint: disable-msg=no-value-for-parameter
+DB_UPDATE_SUMMARY_METRIC = \
+    prometheus_client.Summary("database_update_processing_seconds",
+                              "Time spent handling Database Update Call")
+# pylint: disable-msg=no-value-for-parameter
+DB_INSERT_SUMMARY_METRIC = \
+    prometheus_client.Summary("database_insert_processing_seconds",
+                              "Time spent handling Database Insert Call")
+# pylint: disable-msg=no-value-for-parameter
+DB_DELETE_SUMMARY_METRIC = \
+    prometheus_client.Summary("database_delete_processing_seconds",
+                              "Time spent handling Database Delete Call")
+# pylint: disable-msg=no-value-for-parameter
+DB_FIND_PARAMS_SUMMARY_METRIC = \
+    prometheus_client.Summary("database_find_params_processing_seconds",
+                              "Time spent handling Database FindParams Call")
+# pylint: disable-msg=no-value-for-parameter
+DB_FIND_INSTANCES_SUMMARY_METRIC = \
+    prometheus_client.Summary("database_find_instances_processing_seconds",
+                              "Time spent handling Database FindInstances Call")
+# pylint: disable-msg=no-value-for-parameter
+DB_FIND_OBJECTS_SUMMARY_METRIC = \
+    prometheus_client.Summary("database_find_objects_processing_seconds",
+                              "Time spent handling Database FindObjects Call")
+# pylint: disable-msg=no-value-for-parameter
+DB_FIND_IMPL_OBJECTS_SUMMARY_METRIC = \
+    prometheus_client.Summary("database_find_impl_objects_processing_seconds",
+                              "Time spent handling Database FindImplObjects Call")
 
 
-class Database(object):
+class Database:
     """Represents a simple database"""
     def __init__(self, dm_filename, db_filename, net_intf):
         """Initialize the DB from a file"""
@@ -85,7 +118,7 @@ class Database(object):
                 self._db = {}
                 logger.error("Persisted Database is NOT properly formatted JSON: %s", parse_err)
 
-
+    @DB_GET_SUMMARY_METRIC.time()
     def get(self, path):
         """Retrieve the value of the incoming path, or throw a NoSuchPathError"""
         if path in self._db:
@@ -112,6 +145,7 @@ class Database(object):
         else:
             raise NoSuchPathError(path)
 
+    @DB_UPDATE_SUMMARY_METRIC.time()
     def update(self, path, value):
         """Change the value of the incoming path, or throw a NoSuchPathError"""
         if path in self._db:
@@ -120,7 +154,7 @@ class Database(object):
         else:
             raise NoSuchPathError(path)
 
-
+    @DB_FIND_PARAMS_SUMMARY_METRIC.time()
     def find_params(self, path):
         """Retrieve a set of parameter paths that match the incoming path"""
         found_keys = []
@@ -172,6 +206,7 @@ class Database(object):
 
         return is_writable
 
+    @DB_FIND_INSTANCES_SUMMARY_METRIC.time()
     def find_instances(self, partial_path):
         """Retrieve a set of object instance paths that match the incoming path"""
         found_keys = []
@@ -221,6 +256,7 @@ class Database(object):
 
         return found_keys
 
+    @DB_FIND_OBJECTS_SUMMARY_METRIC.time()
     def find_objects(self, partial_path):
         """Retrieve a set of instantiated object paths that match the incoming path"""
         found_keys = []
@@ -264,6 +300,7 @@ class Database(object):
 
         return found_keys
 
+    @DB_FIND_IMPL_OBJECTS_SUMMARY_METRIC.time()
     def find_impl_objects(self, partial_path, next_level):
         """Retrieve a set of implemented object paths that match the incoming path"""
         found_keys = []
@@ -323,11 +360,13 @@ class Database(object):
 
         return found_keys
 
+    @DB_INSERT_SUMMARY_METRIC.time()
     def insert(self, partial_path):
         """Insert a new record in the table"""
         logger = logging.getLogger(self.__class__.__name__)
 
-        if len(self.find_impl_objects(partial_path, True)) > 0:
+        # Check to see if the returned list is not empty
+        if self.find_impl_objects(partial_path, True):
             dm_regex_str = partial_path
             dm_regex_str = re.sub(r'\{(.+?)\}', '{i}', dm_regex_str)
             dm_regex_str = re.sub(r'\.\d+\.', '.{i}.', dm_regex_str)
@@ -352,11 +391,13 @@ class Database(object):
 
         return next_inst_num
 
+    @DB_DELETE_SUMMARY_METRIC.time()
     def delete(self, partial_path):
         """Remove an existing record from the table"""
         logger = logging.getLogger(self.__class__.__name__)
 
-        if len(self.find_objects(partial_path)) > 0:
+        # Check to see if the returned list is not empty
+        if self.find_objects(partial_path):
             dm_regex_str = partial_path
             dm_regex_str = re.sub(r'\{(.+?)\}', '{i}', dm_regex_str)
             dm_regex_str = re.sub(r'\.\d+\.', '.{i}.', dm_regex_str)
@@ -373,7 +414,6 @@ class Database(object):
                 raise NoSuchPathError(partial_path)
         else:
             raise NoSuchPathError(partial_path)
-
 
     def _db_regex(self, path, partial_path):
         """Generate a regex for determining whether or note a path is in the DB"""
@@ -416,7 +456,6 @@ class Database(object):
         with self._file_write_lock:
             with open(self._db_filename, "w") as db_file:
                 json.dump(self._db, db_file)
-
 
 
 class NoSuchPathError(Exception):
