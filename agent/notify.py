@@ -43,7 +43,7 @@ from agent import usp_msg_pb2 as usp_msg
 from agent import usp_record_pb2 as usp_record
 
 
-class Notification(object):
+class Notification:
     """Encapsulates a specific type of USP Notification"""
     def __init__(self, from_id, to_id, subscription_id):
         """Initialize the Notification Type"""

@@ -40,7 +40,7 @@ from agent import stomp_agent
 
 
 
-class Agent(object):
+class Agent:
     """A USP Agent Wrapper"""
     def __init__(self, cfg_file_name, log_file_name, log_level=logging.INFO):
         """Initialize the Agent"""
