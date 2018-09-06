@@ -148,7 +148,7 @@ class StompUspBinding(generic_usp_binding.GenericUspBinding):
         #   - Bulld the full destination: self._build_dest(dest)
         #   - Retrieve the ID from the dictionary for the destination
         #   - Unsubscribe: self._conn.unsubscribe(id)
-        self._conn.subscribe(agent_addr, id=str(msg_id), ack="auto")
+        self._conn.subscribe(self._my_dest, id=str(msg_id), ack="auto")
         self._logger.info("Subscribed to Destination: %s", self._my_dest)
 
     def clean_up(self):
