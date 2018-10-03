@@ -527,7 +527,7 @@ class NotificationSender(threading.Thread):
         to_addr = None
         retry_count = 0
 
-        while to_addr is None or retry_count > self._num_retries:
+        while to_addr is None and retry_count <= self._num_retries:
             to_addr = self._retrieve_to_addr()
             if to_addr is None:
                 self._logger.info("Waiting %d seconds before attempting to resolve address", self._retry_interval)
